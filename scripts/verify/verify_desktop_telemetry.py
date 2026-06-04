@@ -20,6 +20,7 @@ def main() -> int:
     settings.DATA_COLLECTION_ENABLED = True
     settings.CLIPBOARD_COLLECTION_ENABLED = True
     settings.MIN_CLIPBOARD_CHARS = 1
+    settings.CLIPBOARD_MAX_CHARS = 50
     settings.configure()
 
     app = QApplication.instance() or QApplication([])
@@ -29,7 +30,7 @@ def main() -> int:
         events.append(event)
 
     clipboard = app.clipboard()
-    clipboard_collector = ClipboardCollector(clipboard, "session", emit)
+    clipboard_collector = ClipboardCollector(clipboard, "session", 1, emit)
     clipboard_collector.start()
 
     output = QTextEdit()
@@ -39,6 +40,8 @@ def main() -> int:
     reader.mark_output_start()
 
     clipboard.setText("https://example.com clipboard text")
+    app.processEvents()
+    clipboard.setText("x" * 60)
     app.processEvents()
 
     output.verticalScrollBar().setValue(output.verticalScrollBar().maximum())
@@ -55,6 +58,14 @@ def main() -> int:
     missing = required - event_types
     if missing:
         print(f"FAIL: missing telemetry events: {sorted(missing)}")
+        return 1
+    oversized = [
+        event
+        for event in events
+        if event.event_type == "clipboard" and event.payload.get("text") == "x" * 60
+    ]
+    if oversized:
+        print("FAIL: oversized clipboard item was emitted.")
         return 1
     return 0
 

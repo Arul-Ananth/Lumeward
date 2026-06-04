@@ -19,9 +19,11 @@ def _assert_equal(actual, expected, label: str) -> None:
 def main() -> int:
     original_mode = settings.APP_MODE
     original_serper = settings.SERPER_API_KEY
+    original_server_fallback = settings.ALLOW_SERVER_DDG_FALLBACK
 
     try:
         settings.SERPER_API_KEY = ""
+        settings.ALLOW_SERVER_DDG_FALLBACK = False
 
         settings.APP_MODE = AppMode.DESKTOP
         _assert_equal(resolve_search_mode({"serper_api_key": "abc"}), "serper", "desktop serper mode")
@@ -31,6 +33,9 @@ def main() -> int:
         settings.APP_MODE = AppMode.SERVER
         _assert_equal(resolve_search_mode({}), "disabled", "server disabled mode")
         _assert_equal(describe_search_mode({}), "Web search unavailable.", "server mode description")
+        settings.ALLOW_SERVER_DDG_FALLBACK = True
+        _assert_equal(resolve_search_mode({}), "fallback", "server explicit fallback mode")
+        settings.ALLOW_SERVER_DDG_FALLBACK = False
 
         serper_tool = WebSearchTool(serper_api_key="abc", allow_fallback=True)
         serper_tool._serper_search = lambda query: f"SERPER:{query}"  # type: ignore[method-assign]
@@ -60,6 +65,7 @@ def main() -> int:
     finally:
         settings.APP_MODE = original_mode
         settings.SERPER_API_KEY = original_serper
+        settings.ALLOW_SERVER_DDG_FALLBACK = original_server_fallback
         settings.configure()
 
 

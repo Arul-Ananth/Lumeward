@@ -16,6 +16,7 @@ Tool Name: Web Search
 /docs/intro-react.md
 IMPORTANT: Use the following format
 Actual content line about React.
+OPENAI_API_KEY=sk-thisisasecretkeyvaluethatmustbemasked
 ```
 Action: Web Search
 ```
@@ -24,6 +25,8 @@ Action: Web Search
     assert "Access user documents" not in cleaned
     assert "Tool Name" not in cleaned
     assert "/docs/" not in cleaned
+    assert "sk-thisisasecret" not in cleaned
+    assert "OPENAI_API_KEY=[REDACTED]" in cleaned
     assert "Actual content line" in cleaned
     print("Memory sanitizer verification OK.")
 

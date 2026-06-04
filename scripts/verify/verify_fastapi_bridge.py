@@ -30,10 +30,11 @@ def main() -> int:
     ingest_queue = ctx.Queue()
     status_queue = ctx.Queue()
     stop_event = ctx.Event()
+    bridge_token = "verify-token"
 
     process = ctx.Process(
         target=run_api_server,
-        args=(ingest_queue, status_queue, stop_event, 12345),
+        args=(ingest_queue, status_queue, stop_event, 12345, bridge_token),
         daemon=True,
     )
     process.start()
@@ -53,7 +54,34 @@ def main() -> int:
         return 1
 
     url = f"http://127.0.0.1:{port}/ingest"
-    resp = requests.post(url, json={"url": "https://example.com", "text": "hello"}, timeout=5)
+    denied = requests.post(url, json={"url": "https://example.com", "text": "hello"}, timeout=5)
+    if denied.status_code != 403:
+        print(f"FAIL: /ingest without token returned {denied.status_code}, expected 403")
+        stop_event.set()
+        process.join(timeout=3)
+        return 1
+
+    options = requests.options(
+        url,
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "Content-Type, X-Bridge-Token",
+        },
+        timeout=5,
+    )
+    if options.status_code != 204 or options.headers.get("Access-Control-Allow-Origin") != "http://localhost:5173":
+        print(f"FAIL: bridge CORS preflight failed: {options.status_code} {dict(options.headers)}")
+        stop_event.set()
+        process.join(timeout=3)
+        return 1
+
+    resp = requests.post(
+        url,
+        json={"url": "https://example.com", "text": "hello"},
+        headers={"X-Bridge-Token": bridge_token, "Origin": "http://localhost:5173"},
+        timeout=5,
+    )
     if resp.status_code != 200:
         print(f"FAIL: /ingest returned {resp.status_code}")
         stop_event.set()

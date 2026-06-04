@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     SERPER_API_KEY: str = ""  # Optional
+    ALLOW_SERVER_DDG_FALLBACK: bool = False
     ENGINE_ENABLED: bool = False
     ENGINE_BASE_URL: str = ""
     ENGINE_API_KEY: str = ""
@@ -54,6 +55,7 @@ class Settings(BaseSettings):
     DATA_COLLECTION_ENABLED: bool = True
     CLIPBOARD_COLLECTION_ENABLED: bool = False
     CLIPBOARD_STORE_RAW_TEXT: bool = False
+    CLIPBOARD_MAX_CHARS: int = 50000
     FOLDER_WATCH_ENABLED: bool = False
     MIN_CLIPBOARD_CHARS: int = 20
     DOC_MAX_MB: int = 10

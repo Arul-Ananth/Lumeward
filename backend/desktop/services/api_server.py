@@ -7,21 +7,57 @@ import time
 from multiprocessing import Queue
 
 import uvicorn
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request, Response
 from pydantic import BaseModel
+
+from backend.common.config import settings
 
 logger = logging.getLogger(__name__)
 
 BRIDGE_TOKEN_HEADER = "X-Bridge-Token"
+BRIDGE_ALLOWED_METHODS = "POST, OPTIONS"
+BRIDGE_ALLOWED_HEADERS = f"Content-Type, {BRIDGE_TOKEN_HEADER}"
 
 app = FastAPI()
 _ingest_queue: Queue | None = None
 _bridge_token: str | None = None
 
 
+def _allowed_origins() -> set[str]:
+    return set(settings.cors_origins()) | {"http://127.0.0.1:5173", "http://localhost:5173"}
+
+
+def _cors_origin(request: Request) -> str | None:
+    origin = request.headers.get("origin")
+    if origin in _allowed_origins():
+        return origin
+    return None
+
+
+def _with_cors_headers(response: Response, request: Request) -> Response:
+    origin = _cors_origin(request)
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Vary"] = "Origin"
+        response.headers["Access-Control-Allow-Methods"] = BRIDGE_ALLOWED_METHODS
+        response.headers["Access-Control-Allow-Headers"] = BRIDGE_ALLOWED_HEADERS
+    return response
+
+
+@app.middleware("http")
+async def add_bridge_cors_headers(request: Request, call_next):
+    response = await call_next(request)
+    return _with_cors_headers(response, request)
+
+
 class IngestPayload(BaseModel):
     url: str | None = None
     text: str | None = None
+
+
+@app.options("/ingest")
+def ingest_options(request: Request):
+    return _with_cors_headers(Response(status_code=204), request)
 
 
 def init_queue(queue: Queue, bridge_token: str) -> None:

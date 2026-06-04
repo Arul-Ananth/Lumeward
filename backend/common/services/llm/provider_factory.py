@@ -142,4 +142,6 @@ def build_llm(api_keys: dict | None = None) -> LLM:
 
 
 def allow_search_fallback() -> bool:
-    return settings.APP_MODE == AppMode.DESKTOP
+    if settings.APP_MODE == AppMode.DESKTOP:
+        return True
+    return settings.ALLOW_SERVER_DDG_FALLBACK

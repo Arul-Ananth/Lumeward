@@ -61,6 +61,9 @@ class ClipboardCollector(QObject):
         text = self.clipboard.text().strip()
         if len(text) < settings.MIN_CLIPBOARD_CHARS:
             return
+        if len(text) > settings.CLIPBOARD_MAX_CHARS:
+            logger.info("Ignoring clipboard item over %s characters.", settings.CLIPBOARD_MAX_CHARS)
+            return
 
         content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
         if content_hash == self._last_hash:
