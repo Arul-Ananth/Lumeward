@@ -1,3 +1,10 @@
+"""Compatibility helpers for older newsletter crew callers.
+
+The active newsletter path uses ``newsletter_service`` and ``tool_policy``
+directly. Keep this module as a thin import surface for manual scripts or
+external callers that still use ``run_newsletter_crew``.
+"""
+
 from typing import Any, Type, Union
 
 from crewai.tools import BaseTool

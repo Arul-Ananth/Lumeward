@@ -24,7 +24,6 @@ class Settings(BaseSettings):
     APP_MODE: AppMode = AppMode.SERVER
     SECRET_KEY: str | None = None
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     SERVER_HOST: str = "127.0.0.1"
     SERVER_PORT: int = 8000
     CORS_ALLOWED_ORIGINS: str = "http://localhost:5173"

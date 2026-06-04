@@ -1,29 +1,14 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 
-interface SettingsContextType {
-    apiKey: string;
-    setApiKey: (key: string) => void;
-    serperKey: string;
-    setSerperKey: (key: string) => void;
-}
-
-const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
-
-export function useSettings() {
-    const context = useContext(SettingsContext);
-    if (!context) {
-        throw new Error('useSettings must be used within a SettingsProvider');
-    }
-    return context;
-}
+import { SettingsContext } from '../context/SettingsContext';
 
 function usePersistedSetting(storageKey: string, initialValue = '') {
     const [value, setValue] = useState(() => localStorage.getItem(storageKey) || initialValue);
 
-    const updateValue = (nextValue: string) => {
+    const updateValue = useCallback((nextValue: string) => {
         setValue(nextValue);
         localStorage.setItem(storageKey, nextValue);
-    };
+    }, [storageKey]);
 
     return [value, updateValue] as const;
 }
@@ -39,7 +24,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
             serperKey,
             setSerperKey,
         }),
-        [apiKey, serperKey],
+        [apiKey, setApiKey, serperKey, setSerperKey],
     );
 
     return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

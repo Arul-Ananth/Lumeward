@@ -3,7 +3,7 @@ import {
     Dialog, DialogTitle, DialogContent, DialogActions,
     TextField, Button, Typography, Box, Divider
 } from '@mui/material';
-import { useSettings } from '../context/SettingsContext';
+import { useSettings } from '../hooks/useSettings';
 
 interface SettingsDialogProps {
     open: boolean;

@@ -1,19 +1,16 @@
 import {
-    createContext,
     useCallback,
-    useContext,
     useEffect,
     useMemo,
     useState,
     type ReactNode,
 } from 'react';
 
-import { ApiError } from '../../services/http';
-import { getAuthStatus, login as loginRequest, logout as logoutRequest, signup as signupRequest } from './api';
-import { clearSessionToken, getSessionToken, setSessionToken } from './storage';
-import { buildOfflineAuthStatus, type AuthContextValue, type AuthStatusResponse, type SignupResponse } from './types';
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+import { AuthContext } from '../context/AuthContext';
+import { ApiError } from '../services/http';
+import { getAuthStatus, login as loginRequest, logout as logoutRequest, signup as signupRequest } from '../features/auth/api';
+import { clearSessionToken, getSessionToken, setSessionToken } from '../features/auth/storage';
+import { buildOfflineAuthStatus, type AuthContextValue, type AuthStatusResponse, type SignupResponse } from '../features/auth/types';
 
 function normalizeAuthBootstrapError(error: unknown): AuthStatusResponse {
     if (error instanceof ApiError && error.status === 0) {
@@ -112,12 +109,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth(): AuthContextValue {
-    const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth must be used within an AuthProvider');
-    }
-    return context;
 }

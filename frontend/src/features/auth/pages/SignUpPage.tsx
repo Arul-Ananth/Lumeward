@@ -14,7 +14,7 @@ import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
 import AuthSplitLayout from '../../../components/AuthSplitLayout';
 import { socialLogin } from '../api';
-import { useAuth } from '../AuthProvider';
+import { useAuth } from '../../../hooks/useAuth';
 
 function GoogleIcon() {
     return (

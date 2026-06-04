@@ -2,7 +2,7 @@ import React from 'react';
 import { AppBar, Toolbar, Typography, Container, Tabs, Tab, Button, Box, Chip } from '@mui/material';
 import { SmartToy as BotIcon, Psychology as BrainIcon, Newspaper as NewsIcon, Settings as SettingsIcon } from '@mui/icons-material';
 
-import { useAuth } from '../features/auth/AuthProvider';
+import { useAuth } from '../hooks/useAuth';
 import SettingsDialog from './SettingsDialog';
 
 interface CustomAppBarProps {

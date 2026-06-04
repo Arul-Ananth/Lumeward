@@ -16,7 +16,7 @@ import { api } from '../services/api';
 import type { MemoryRecord, NewsletterResponse } from '../services/api';
 import CustomAppBar from '../components/CustomAppBar';
 
-import { useSettings } from '../context/SettingsContext';
+import { useSettings } from '../hooks/useSettings';
 
 const Dashboard = () => {
     const { apiKey, serperKey } = useSettings();

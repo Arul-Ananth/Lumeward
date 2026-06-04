@@ -8,8 +8,9 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
 import { getApiBaseUrl } from './services/http';
-import { AuthProvider, useAuth } from './features/auth/AuthProvider';
-import { SettingsProvider } from './context/SettingsContext';
+import { useAuth } from './hooks/useAuth';
+import { AuthProvider } from './providers/AuthProvider';
+import { SettingsProvider } from './providers/SettingsProvider';
 import AppTheme from './theme/AppTheme';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
