@@ -11,10 +11,13 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QScrollArea,
+    QTextBrowser,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
+
+from backend.desktop.ui.collapsible_log_widget import CollapsibleLogWidget
 
 PRESET_GUIDANCE: dict[str, str] = {
     "For beginners": "Write for beginners.",
@@ -34,14 +37,14 @@ class MainWindowWidgets:
     attached_context_area: QTextEdit
     status_label: QLabel
     capability_label: QLabel
-    activity_area: QTextEdit
     generate_btn: QPushButton
     regenerate_btn: QPushButton
     copy_btn: QPushButton
     clear_btn: QPushButton
     save_btn: QPushButton
     result_meta_label: QLabel
-    output_area: QTextEdit
+    output_area: QTextBrowser
+    log_widget: CollapsibleLogWidget
     preset_buttons: dict[str, QPushButton]
 
 
@@ -92,21 +95,15 @@ def build_main_window_content() -> MainWindowWidgets:
     run_box, run_layout = _build_section("Run")
     status_label = QLabel("Status: Idle")
     status_label.setWordWrap(True)
-    capability_label = QLabel("Search: Unknown | Bridge: Unknown")
+    capability_label = QLabel("Search: Unknown")
     capability_label.setWordWrap(True)
     run_layout.addWidget(status_label)
     run_layout.addWidget(capability_label)
 
     generate_btn = QPushButton("Generate Brief")
+    generate_btn.setObjectName("primaryButton")
     generate_btn.setMinimumHeight(40)
     run_layout.addWidget(generate_btn)
-
-    run_layout.addWidget(QLabel("Activity"))
-    activity_area = QTextEdit()
-    activity_area.setReadOnly(True)
-    activity_area.setMaximumHeight(96)
-    activity_area.setPlaceholderText("Status and tool activity will appear here.")
-    run_layout.addWidget(activity_area)
     root_layout.addWidget(run_box)
 
     result_box, result_layout = _build_section("Result")
@@ -125,11 +122,16 @@ def build_main_window_content() -> MainWindowWidgets:
     result_actions.addStretch(1)
     result_layout.addLayout(result_actions)
 
-    output_area = QTextEdit()
+    output_area = QTextBrowser()
+    output_area.setObjectName("digestOutput")
     output_area.setReadOnly(True)
+    output_area.setOpenExternalLinks(False)
     output_area.setMinimumHeight(320)
     output_area.setPlaceholderText("Your generated brief will appear here.")
     result_layout.addWidget(output_area, 1)
+
+    log_widget = CollapsibleLogWidget()
+    result_layout.addWidget(log_widget)
     root_layout.addWidget(result_box, 1)
 
     scroll_area = QScrollArea()
@@ -145,7 +147,6 @@ def build_main_window_content() -> MainWindowWidgets:
         attached_context_area=attached_context_area,
         status_label=status_label,
         capability_label=capability_label,
-        activity_area=activity_area,
         generate_btn=generate_btn,
         regenerate_btn=regenerate_btn,
         copy_btn=copy_btn,
@@ -153,5 +154,6 @@ def build_main_window_content() -> MainWindowWidgets:
         save_btn=save_btn,
         result_meta_label=result_meta_label,
         output_area=output_area,
+        log_widget=log_widget,
         preset_buttons=preset_buttons,
     )

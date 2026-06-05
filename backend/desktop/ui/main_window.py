@@ -3,6 +3,7 @@ import queue as std_queue
 import time
 from datetime import datetime
 
+from backend.common.services.newsletter.compiler import compile_html
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox, QToolBar
@@ -57,6 +58,7 @@ class MainWindow(QMainWindow):
         self._has_result = False
         self._generation_error_pending = False
         self._ollama_checked = False
+        self._current_markdown = ""
 
         self.setWindowTitle("Lumeward")
         self.resize(980, 780)
@@ -123,7 +125,7 @@ class MainWindow(QMainWindow):
         self._update_action_states()
 
     def open_settings(self) -> None:
-        dlg = SettingsDialog(self, on_saved=self._on_settings_saved)
+        dlg = SettingsDialog(self, on_saved=self._on_settings_saved, bridge_status=self._bridge_status_text())
         dlg.exec()
 
     def start_generation(self) -> None:
@@ -147,6 +149,7 @@ class MainWindow(QMainWindow):
         self.show_status("Researching...")
         self._append_activity(f"Starting brief generation for: {topic}")
         self.output_area.clear()
+        self._current_markdown = ""
         self._has_result = False
         self._generation_error_pending = False
         self._set_result_placeholder(f"Starting research on '{topic}'... This may take a minute.")
@@ -194,7 +197,8 @@ class MainWindow(QMainWindow):
 
     def on_ai_result(self, result: str) -> None:
         if result:
-            self.output_area.setMarkdown(result)
+            self._current_markdown = result
+            self.output_area.setHtml(_digest_html(result))
             self.telemetry.mark_output_start()
             topic = self.topic_input.text().strip()
             search_mode = resolve_search_mode(api_keys=self._current_api_keys())
@@ -212,6 +216,7 @@ class MainWindow(QMainWindow):
                 self._update_action_states()
                 return
             self._has_result = False
+            self._current_markdown = ""
             self._set_result_placeholder("No output generated.")
             self._update_result_metadata(
                 self.topic_input.text().strip(),
@@ -225,6 +230,7 @@ class MainWindow(QMainWindow):
         topic = self.topic_input.text().strip()
         search_mode = resolve_search_mode(api_keys=self._current_api_keys())
         self._has_result = False
+        self._current_markdown = ""
         self._generation_error_pending = True
         self._set_result_placeholder(message)
         self._append_activity(message)
@@ -391,6 +397,7 @@ class MainWindow(QMainWindow):
 
     def clear_result(self) -> None:
         self.output_area.clear()
+        self._current_markdown = ""
         self._has_result = False
         self._update_result_metadata(None)
         self._append_activity("Result cleared.")
@@ -431,8 +438,8 @@ class MainWindow(QMainWindow):
         self._append_activity(f"Guidance preset applied: {preset_text}")
 
     def _append_activity(self, message: str) -> None:
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        self.ui.activity_area.append(f"[{timestamp}] {message}")
+        self.ui.log_widget.append_message(message)
+        logger.info("Desktop activity: %s", message)
 
     def _current_api_keys(self) -> dict[str, str | None]:
         return {
@@ -518,12 +525,16 @@ class MainWindow(QMainWindow):
             "fallback": "Fallback",
             "disabled": "Disabled",
         }.get(resolved_search_mode, resolved_search_mode.title())
-        bridge_label = "Disabled"
-        if self._api_process is not None and not self._bridge_disabled:
-            bridge_label = "Ready" if self._bridge_started else "Starting"
-        elif self._api_process is None and not self._bridge_disabled:
-            bridge_label = "Unavailable"
-        self.ui.capability_label.setText(f"Search: {search_label} | Bridge: {bridge_label}")
+        self.ui.capability_label.setText(f"Search: {search_label}")
+
+    def _bridge_status_text(self) -> str:
+        if self._bridge_disabled:
+            return "Disabled for this session."
+        if self._api_process is None:
+            return "Unavailable in this session."
+        if self._bridge_started:
+            return "Ready on local loopback. Requests require the runtime bridge token."
+        return "Starting on local loopback. Requests require the runtime bridge token."
 
     def _update_result_metadata(
         self,
@@ -549,9 +560,7 @@ class MainWindow(QMainWindow):
         )
 
     def _current_output_markdown(self) -> str:
-        if hasattr(self.output_area, "toMarkdown"):
-            return self.output_area.toMarkdown()
-        return self.output_area.toPlainText()
+        return self._current_markdown or self.output_area.toPlainText()
 
     def _set_result_placeholder(self, message: str) -> None:
         self.output_area.setPlainText(message)
@@ -578,3 +587,54 @@ class MainWindow(QMainWindow):
         self.ui.copy_btn.setEnabled(has_output)
         self.ui.clear_btn.setEnabled(has_output)
         self.ui.save_btn.setEnabled(has_output)
+
+
+def _digest_html(markdown: str) -> str:
+    return f"""
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body {{
+    background: #161617;
+    color: #e5e5ea;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 26px 30px;
+}}
+h1 {{
+    color: #f5f5f7;
+    font-size: 25px;
+    font-weight: 700;
+    line-height: 1.24;
+    margin: 0 0 22px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #2c2c2e;
+}}
+h2 {{
+    color: #f2f2f7;
+    font-size: 19px;
+    font-weight: 650;
+    margin: 28px 0 10px;
+}}
+p {{
+    margin: 0 0 14px;
+}}
+ul {{
+    margin: 8px 0 18px 22px;
+    padding: 0;
+}}
+li {{
+    margin: 0 0 8px;
+}}
+strong {{
+    color: #ffffff;
+}}
+</style>
+</head>
+<body>{compile_html(markdown)}</body>
+</html>
+"""

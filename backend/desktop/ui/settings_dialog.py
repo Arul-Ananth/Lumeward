@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -12,7 +13,9 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
+    QWidget,
 )
 
 from backend.common.services.telemetry.consent import add_folder_consent
@@ -37,13 +40,23 @@ from backend.desktop.security import delete_secret, get_secret, set_secret
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, parent=None, on_saved=None):
+    def __init__(self, parent=None, on_saved=None, bridge_status: str = "Unavailable"):
         super().__init__(parent)
         self._on_saved = on_saved
         self.setWindowTitle("Settings")
-        self.resize(480, 420)
+        self.resize(560, 620)
+        screen = self.screen()
+        if screen is not None:
+            self.setMaximumHeight(max(420, int(screen.availableGeometry().height() * 0.88)))
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
 
         appearance_group = QGroupBox("Appearance")
         appearance_layout = QFormLayout(appearance_group)
@@ -55,7 +68,7 @@ class SettingsDialog(QDialog):
         index = max(self.theme_mode_input.findData(saved_theme_mode), 0)
         self.theme_mode_input.setCurrentIndex(index)
         appearance_layout.addRow("Theme", self.theme_mode_input)
-        layout.addWidget(appearance_group)
+        content_layout.addWidget(appearance_group)
 
         llm_group = QGroupBox("LLM")
         llm_layout = QFormLayout(llm_group)
@@ -74,7 +87,7 @@ class SettingsDialog(QDialog):
         self.model_input = QLineEdit()
         self.model_input.setText(get_llm_model_name())
         llm_layout.addRow("Model", self.model_input)
-        layout.addWidget(llm_group)
+        content_layout.addWidget(llm_group)
 
         api_group = QGroupBox("API Keys")
         api_layout = QVBoxLayout(api_group)
@@ -95,7 +108,14 @@ class SettingsDialog(QDialog):
         self.serper_input.setEchoMode(QLineEdit.Password)
         self.serper_input.setText(get_secret("serper_api_key") or "")
         api_layout.addWidget(self.serper_input)
-        layout.addWidget(api_group)
+        content_layout.addWidget(api_group)
+
+        bridge_group = QGroupBox("Browser Bridge")
+        bridge_layout = QVBoxLayout(bridge_group)
+        bridge_label = QLabel(bridge_status)
+        bridge_label.setWordWrap(True)
+        bridge_layout.addWidget(bridge_label)
+        content_layout.addWidget(bridge_group)
 
         ingestion_group = QGroupBox("Ingestion")
         ingestion_layout = QVBoxLayout(ingestion_group)
@@ -103,7 +123,7 @@ class SettingsDialog(QDialog):
         self.add_folder_btn = QPushButton("Add Folder to Watch")
         self.add_folder_btn.clicked.connect(self.add_folder)
         ingestion_layout.addWidget(self.add_folder_btn)
-        layout.addWidget(ingestion_group)
+        content_layout.addWidget(ingestion_group)
 
         privacy_group = QGroupBox("Privacy")
         privacy_layout = QVBoxLayout(privacy_group)
@@ -121,8 +141,12 @@ class SettingsDialog(QDialog):
         self.clipboard_raw_checkbox = QCheckBox("Store raw clipboard text (higher sensitivity)")
         self.clipboard_raw_checkbox.setChecked(get_clipboard_store_raw_text_enabled())
         privacy_layout.addWidget(self.clipboard_raw_checkbox)
-        layout.addWidget(privacy_group)
+        content_layout.addWidget(privacy_group)
         self._on_data_collection_toggled(self.data_collection_checkbox.isChecked())
+
+        content_layout.addStretch(1)
+        scroll_area.setWidget(content)
+        layout.addWidget(scroll_area, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.save_settings)
