@@ -198,7 +198,7 @@ class MainWindow(QMainWindow):
     def on_ai_result(self, result: str) -> None:
         if result:
             self._current_markdown = result
-            self.output_area.setHtml(render_digest_html(result))
+            self.output_area.setHtml(render_digest_html(result, self._current_theme_mode()))
             self.telemetry.mark_output_start()
             topic = self.topic_input.text().strip()
             search_mode = resolve_search_mode(api_keys=self._current_api_keys())
@@ -517,6 +517,8 @@ class MainWindow(QMainWindow):
         app = QApplication.instance()
         if app is not None:
             apply_app_theme(app, get_theme_mode())
+        if self._current_markdown:
+            self.output_area.setHtml(render_digest_html(self._current_markdown, self._current_theme_mode()))
         self._append_activity("Settings saved.")
         self._update_runtime_summary()
         self._update_action_states()
@@ -530,3 +532,10 @@ class MainWindow(QMainWindow):
         self.ui.copy_btn.setEnabled(has_output)
         self.ui.clear_btn.setEnabled(has_output)
         self.ui.save_btn.setEnabled(has_output)
+
+    def _current_theme_mode(self) -> str:
+        app = QApplication.instance()
+        if app is None:
+            return "dark"
+        mode = app.property("lumeward.theme_effective")
+        return "light" if mode == "light" else "dark"

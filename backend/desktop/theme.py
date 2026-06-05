@@ -90,11 +90,12 @@ QPushButton#primaryButton {
     border-radius: 6px;
     font-weight: 700;
 }
-QPushButton#secondaryButton {
+QPushButton#secondaryButton, QToolButton#secondaryButton {
     background-color: transparent;
     color: #3a3a3c;
     border: 1px solid #d1d1d6;
     border-radius: 6px;
+    padding: 8px 12px;
 }
 QTextBrowser#digestOutput {
     background-color: #ffffff;
@@ -153,11 +154,12 @@ QPushButton#primaryButton {
     border-radius: 6px;
     font-weight: 700;
 }
-QPushButton#secondaryButton {
+QPushButton#secondaryButton, QToolButton#secondaryButton {
     background-color: transparent;
     color: #c7c7cc;
     border: 1px solid #2c2c2e;
     border-radius: 6px;
+    padding: 8px 12px;
 }
 QPushButton:disabled {
     color: #6f6f73;
