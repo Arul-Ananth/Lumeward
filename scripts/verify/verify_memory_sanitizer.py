@@ -1,9 +1,6 @@
-import sys
-from pathlib import Path
+from _bootstrap import setup_project_path
 
-root = Path(__file__).resolve().parents[2]
-if str(root) not in sys.path:
-    sys.path.append(str(root))
+setup_project_path()
 
 from backend.common.services.memory.memory_sanitizer import sanitize_memory_context
 

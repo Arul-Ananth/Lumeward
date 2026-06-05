@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 import time
-
-from crewai import LLM
+from typing import TYPE_CHECKING
 
 from backend.common.config import AppMode, settings
 from backend.common.services.network import build_request_headers, build_retry_session
 from backend.common.services.security_policy import audit_policy_decision, authorize_network_action
+
+if TYPE_CHECKING:
+    from crewai import LLM
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +22,8 @@ _ENGINE_CACHE_TTL_SECONDS = 30.0
 
 
 def _build_remote_engine_llm() -> LLM:
+    from crewai import LLM
+
     model, base_url, api_key = _resolve_remote_engine_config()
     check_remote_engine_ready()
     return LLM(
@@ -103,13 +107,15 @@ def is_remote_engine_enabled() -> bool:
 
 
 def build_llm(api_keys: dict | None = None) -> LLM:
+    from crewai import LLM
+
     if settings.ENGINE_ENABLED:
         return _build_remote_engine_llm()
 
     keys = api_keys or {}
     provider = (settings.LLM_PROVIDER or "").strip().lower()
     if not provider:
-        raise ValueError("LLM_PROVIDER is not set. Use 'ollama', 'openai', or 'google' in .env.")
+        provider = "ollama"
 
     if provider == "openai":
         openai_key = keys.get("openai_api_key") or settings.OPENAI_API_KEY
@@ -126,7 +132,8 @@ def build_llm(api_keys: dict | None = None) -> LLM:
         base_url = settings.OPENAI_API_BASE or ""
         api_key = gemini_key
     elif provider == "ollama":
-        model = f"ollama/{settings.OPENAI_MODEL_NAME.split(':')[0]}"
+        model_name = settings.OPENAI_MODEL_NAME.strip() or "mistral:latest"
+        model = f"ollama/{model_name}"
         base_url = settings.OPENAI_API_BASE or "http://localhost:11434"
         api_key = "NA"
     else:

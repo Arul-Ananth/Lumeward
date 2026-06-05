@@ -1,9 +1,6 @@
-import sys
-from pathlib import Path
+from _bootstrap import setup_project_path
 
-root = Path(__file__).resolve().parents[2]
-if str(root) not in sys.path:
-    sys.path.append(str(root))
+setup_project_path()
 
 from backend.common.config import AppMode, settings
 from backend.common.services.llm.tool_policy import describe_search_mode, resolve_search_mode

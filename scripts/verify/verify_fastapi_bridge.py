@@ -1,11 +1,9 @@
-import sys
 import time
 from multiprocessing import get_context
-from pathlib import Path
 
-root = Path(__file__).resolve().parents[2]
-if str(root) not in sys.path:
-    sys.path.append(str(root))
+from _bootstrap import setup_project_path
+
+setup_project_path()
 
 import requests
 

@@ -17,13 +17,20 @@ from PySide6.QtWidgets import (
 
 from backend.common.services.telemetry.consent import add_folder_consent
 from backend.desktop.preferences import (
+    apply_llm_preferences_to_settings,
     get_clipboard_collection_enabled,
     get_clipboard_store_raw_text_enabled,
     get_data_collection_enabled,
+    get_llm_base_url,
+    get_llm_model_name,
+    get_llm_provider,
     get_theme_mode,
     set_clipboard_collection_enabled,
     set_clipboard_store_raw_text_enabled,
     set_data_collection_enabled,
+    set_llm_base_url,
+    set_llm_model_name,
+    set_llm_provider,
     set_theme_mode,
 )
 from backend.desktop.security import delete_secret, get_secret, set_secret
@@ -50,6 +57,25 @@ class SettingsDialog(QDialog):
         appearance_layout.addRow("Theme", self.theme_mode_input)
         layout.addWidget(appearance_group)
 
+        llm_group = QGroupBox("LLM")
+        llm_layout = QFormLayout(llm_group)
+        self.provider_input = QComboBox()
+        self.provider_input.addItem("Ollama (local)", "ollama")
+        self.provider_input.addItem("OpenAI compatible", "openai")
+        self.provider_input.addItem("Google Gemini", "google")
+        provider_index = max(self.provider_input.findData(get_llm_provider()), 0)
+        self.provider_input.setCurrentIndex(provider_index)
+        llm_layout.addRow("Provider", self.provider_input)
+
+        self.base_url_input = QLineEdit()
+        self.base_url_input.setText(get_llm_base_url())
+        llm_layout.addRow("Base URL", self.base_url_input)
+
+        self.model_input = QLineEdit()
+        self.model_input.setText(get_llm_model_name())
+        llm_layout.addRow("Model", self.model_input)
+        layout.addWidget(llm_group)
+
         api_group = QGroupBox("API Keys")
         api_layout = QVBoxLayout(api_group)
         api_layout.addWidget(QLabel("OpenAI API Key (Optional):"))
@@ -57,6 +83,12 @@ class SettingsDialog(QDialog):
         self.openai_input.setEchoMode(QLineEdit.Password)
         self.openai_input.setText(get_secret("openai_api_key") or "")
         api_layout.addWidget(self.openai_input)
+
+        api_layout.addWidget(QLabel("Google Gemini API Key (Optional):"))
+        self.gemini_input = QLineEdit()
+        self.gemini_input.setEchoMode(QLineEdit.Password)
+        self.gemini_input.setText(get_secret("gemini_api_key") or "")
+        api_layout.addWidget(self.gemini_input)
 
         api_layout.addWidget(QLabel("Serper API Key (For Web Search):"))
         self.serper_input = QLineEdit()
@@ -99,13 +131,25 @@ class SettingsDialog(QDialog):
 
     def save_settings(self) -> None:
         openai_key = self.openai_input.text().strip()
+        gemini_key = self.gemini_input.text().strip()
         serper_key = self.serper_input.text().strip()
         theme_mode = str(self.theme_mode_input.currentData())
+        provider = str(self.provider_input.currentData())
+        base_url = self.base_url_input.text().strip()
+        model_name = self.model_input.text().strip()
 
+        set_llm_provider(provider)
+        set_llm_base_url(base_url)
+        set_llm_model_name(model_name)
+        apply_llm_preferences_to_settings()
         if openai_key:
             set_secret("openai_api_key", openai_key)
         else:
             delete_secret("openai_api_key")
+        if gemini_key:
+            set_secret("gemini_api_key", gemini_key)
+        else:
+            delete_secret("gemini_api_key")
         if serper_key:
             set_secret("serper_api_key", serper_key)
         else:

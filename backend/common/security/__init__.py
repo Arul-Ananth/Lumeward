@@ -1,3 +1,3 @@
-from backend.common.security.policy import InputSanitizer, SecureAction, SecurityPolicy
+from backend.common.security.policy import InputSanitizer, SecurityPolicy
 
-__all__ = ["InputSanitizer", "SecureAction", "SecurityPolicy"]
+__all__ = ["InputSanitizer", "SecurityPolicy"]

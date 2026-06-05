@@ -6,7 +6,9 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-DEFAULT_HEADERS = {"User-Agent": "Lumeward/1.0"}
+from backend.common.version import APP_VERSION
+
+DEFAULT_HEADERS = {"User-Agent": f"Lumeward/{APP_VERSION}"}
 
 
 def build_retry_session(max_retries: int = 2) -> requests.Session:

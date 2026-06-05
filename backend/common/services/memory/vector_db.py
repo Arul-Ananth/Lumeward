@@ -6,10 +6,10 @@ import threading
 import uuid
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
-from sentence_transformers import SentenceTransformer
 from sqlmodel import Session, select
 
 from backend.common.config import AppMode, settings
@@ -19,8 +19,10 @@ from backend.common.models.sql import EventRaw
 logger = logging.getLogger(__name__)
 
 _ROOT_DIR = Path(__file__).resolve().parents[4]
-_embedder: SentenceTransformer | None = None
+_embedder: Any | None = None
 _embedder_lock = threading.Lock()
+_client: QdrantClient | None = None
+_client_lock = threading.Lock()
 _CLIPBOARD_QUERY_PATTERNS = (
     "clipboard",
     "what did i just copy",
@@ -57,22 +59,43 @@ def _create_client() -> QdrantClient:
     return QdrantClient(path=str(_ROOT_DIR / "qdrant_db_local"))
 
 
-client = _create_client()
+def get_client() -> QdrantClient:
+    global _client
+    if _client is None:
+        with _client_lock:
+            if _client is None:
+                _client = _create_client()
+    return _client
 
 
-def get_embedder() -> SentenceTransformer:
+class _LazyQdrantClient:
+    def __getattr__(self, name: str) -> Any:
+        return getattr(get_client(), name)
+
+    def close(self) -> None:
+        if _client is not None:
+            _client.close()
+
+
+client = _LazyQdrantClient()
+
+
+def get_embedder() -> Any:
     global _embedder
     if _embedder is None:
         with _embedder_lock:
             if _embedder is None:
+                from sentence_transformers import SentenceTransformer
+
                 _embedder = SentenceTransformer("all-MiniLM-L6-v2")
     return _embedder
 
 
 def ensure_collection(name: str) -> None:
-    if client.collection_exists(name):
+    qdrant_client = get_client()
+    if qdrant_client.collection_exists(name):
         return
-    client.create_collection(
+    qdrant_client.create_collection(
         collection_name=name,
         vectors_config=models.VectorParams(
             size=384,

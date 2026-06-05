@@ -1,5 +1,7 @@
 # Lumeward
 
+Current release target: `1.0.0-beta.1`.
+
 Lumeward is a hybrid AI brief/newsletter application with shared backend services and two runtime modes:
 
 - `SERVER` for web clients
@@ -32,10 +34,25 @@ Lumeward is a hybrid AI brief/newsletter application with shared backend service
 
 - Lumeward can call an OpenAI-compatible engine running on another machine.
 - When enabled, Lumeward keeps auth, memory, telemetry, persistence, and tool policy locally and sends only model requests to the remote engine.
+- Server deployments can use this for users who cannot host an LLM locally but can reach a dedicated trusted model machine.
+- Configure it with:
+  - `APP_MODE=SERVER`
+  - `ENGINE_ENABLED=true`
+  - `ENGINE_BASE_URL=https://trusted-engine.example/v1`
+  - `ENGINE_API_KEY=...`
+  - `ENGINE_MODEL_NAME=...`
+
+### Newsletter curation
+
+- Active newsletter orchestration lives in `backend/common/services/newsletter/`.
+- The pipeline retrieves local memory, sanitizes context, runs allowed web search, calls the configured LLM provider or remote engine, compiles Markdown and safe HTML, and persists digest history.
+- Built-in templates include Daily Tech Briefing, Weekly Research Digest, Morning Digest, and Current Events Summary.
+- Server `/news` APIs support generation, digest history/archive, templates, and schedules.
 
 ### Desktop telemetry and clipboard
 
 - Desktop telemetry is opt-in.
+- Telemetry is disabled by default until the user enables data collection in desktop settings or env.
 - Clipboard collection is opt-in.
 - Raw clipboard text is separately opt-in.
 - Recent clipboard-history queries use a direct recent-clipboard path instead of only semantic memory retrieval.
@@ -44,6 +61,7 @@ Lumeward is a hybrid AI brief/newsletter application with shared backend service
 
 - Serper is used when a Serper key is available.
 - Desktop fallback search uses `ddgs` + extraction when Serper is unavailable.
+- Server fallback search is disabled unless `ALLOW_SERVER_DDG_FALLBACK=true` is explicitly set.
 - Search mode is surfaced in the desktop UI.
 
 ### Desktop UI
@@ -76,6 +94,41 @@ Lumeward is a hybrid AI brief/newsletter application with shared backend service
 - `scripts/manual/` manual checks
 - `scripts/dev/` build and operational scripts
 - `packaging/pyinstaller/` desktop packaging specs
+
+## Beta Packaging
+
+Lumeward Beta 1.0 desktop packaging uses the tracked PyInstaller spec as the build source of truth:
+
+```powershell
+.\scripts\dev\windows\build_windows.ps1
+```
+
+macOS and Linux build entrypoints are available at:
+
+```bash
+./scripts/dev/macos/build_macos.sh
+./scripts/dev/linux/build_linux.sh
+```
+
+Packaging outputs are:
+- folder app: `dist/Lumeward/`
+- Windows installer: generated when Inno Setup `iscc` is available
+- macOS DMG: generated when `hdiutil` is available
+- Linux AppImage: generated when `appimagetool` is available
+
+Run preflight before packaging:
+
+```powershell
+.\venv_win\Scripts\python.exe scripts\dev\preflight.py
+```
+
+Install packaging dependencies before building executables:
+
+```powershell
+.\venv_win\Scripts\python.exe -m pip install -r requirements-packaging.txt
+```
+
+Beta 1.0 includes a metadata-only `/news/sources` endpoint for planned future source integrations. It does not load plugins, store plugin credentials, or ingest Telegram/WhatsApp/RSS/email data.
 
 ## Startup
 
@@ -134,6 +187,11 @@ sudo apt install -y python3-venv libgl1 libglib2.0-0 libxkbcommon-x11-0 libdbus-
 ```
 
 Notes:
-- `requirements-desktop-linux.txt` adds the CrewAI Google provider extra used by `LLM_PROVIDER=google`.
-- It also installs Linux keyring backends so desktop secret access works more reliably for other developers.
+- `requirements.txt` includes the CrewAI Google provider extra used by `LLM_PROVIDER=google`.
+- `requirements-desktop-linux.txt` installs Linux keyring backends so desktop secret access works more reliably for other developers.
 - In WSL, a working GUI environment is still required for PySide6 desktop mode.
+
+## macOS Desktop Notes
+
+Desktop data defaults to `~/Library/Application Support/Lumeward`.
+macOS may prompt for user approval when a source plugin or collector accesses protected locations such as Desktop, Documents, Downloads, screen capture, or automation. Prefer user-selected folders and official service APIs over direct reads of other apps' private storage.

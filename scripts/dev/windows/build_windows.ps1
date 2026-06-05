@@ -1,5 +1,5 @@
-# Lumeward Build Script for Windows
-Write-Host "Starting Build Process..."
+# Lumeward Beta 1.0 Windows Build Script
+Write-Host "Starting Lumeward Windows build..."
 
 # Activate Venv
 $d = ".\venv_win\Scripts\activate.ps1"
@@ -11,19 +11,27 @@ else {
     exit 1
 }
 
-# Run PyInstaller
-# We need to handle hidden imports for dynamic libraries like CrewAI and Qdrant
-# --collect-all might be needed for some packages, but start with --hidden-import
-$imports = "--hidden-import=crewai --hidden-import=qdrant_client --hidden-import=keyring --hidden-import=PySide6 --hidden-import=litellm"
-$paths = "--paths=backend --paths=backend/desktop"
-
-Write-Host "Running PyInstaller..."
-pyinstaller --noconfirm --onedir --windowed --name "Lumeward" $imports $paths backend/desktop/main.py
+Write-Host "Running PyInstaller from tracked spec..."
+pyinstaller --noconfirm packaging\pyinstaller\Lumeward.spec
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "Build Successful! Executable in dist\Lumeward\Lumeward.exe"
+    Write-Host "Folder build successful: dist\Lumeward\Lumeward.exe"
 }
 else {
     Write-Host "Build Failed."
     exit $LASTEXITCODE
+}
+
+$iscc = Get-Command iscc -ErrorAction SilentlyContinue
+if ($iscc) {
+    Write-Host "Inno Setup detected. Building installer..."
+    iscc packaging\installers\windows\Lumeward.iss
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Installer build failed."
+        exit $LASTEXITCODE
+    }
+    Write-Host "Installer build complete."
+}
+else {
+    Write-Host "Inno Setup not found. Skipping installer; folder build is ready."
 }

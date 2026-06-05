@@ -56,6 +56,45 @@ class UsageLog(SQLModel, table=True):
     total_cost: int
 
 
+class NewsletterTemplate(SQLModel, table=True):
+    key: str = Field(primary_key=True, max_length=80)
+    name: str = Field(max_length=120)
+    description: str = Field(max_length=500)
+    cadence: str = Field(default="on_demand", max_length=32)
+    prompt_hint: str
+    is_builtin: bool = Field(default=True, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class NewsletterDigest(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    template_key: str = Field(default="daily_tech", foreign_key="newslettertemplate.key", index=True, max_length=80)
+    title: str = Field(max_length=200)
+    topic: str = Field(max_length=255)
+    markdown: str
+    html: str
+    archived: bool = Field(default=False, index=True)
+    source_schedule_id: int | None = Field(default=None, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class NewsletterSchedule(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    name: str = Field(max_length=120)
+    template_key: str = Field(foreign_key="newslettertemplate.key", index=True, max_length=80)
+    topic_seed: str = Field(max_length=255)
+    cadence: str = Field(max_length=16)
+    local_time: str = Field(max_length=5)
+    timezone: str = Field(max_length=64)
+    enabled: bool = Field(default=True, index=True)
+    last_run_at: datetime | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class EventRaw(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     event_type: str = Field(index=True, max_length=80)

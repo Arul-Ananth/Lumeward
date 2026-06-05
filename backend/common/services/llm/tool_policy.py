@@ -1,6 +1,5 @@
 from backend.common.config import settings
 from backend.common.services.llm.provider_factory import allow_search_fallback
-from backend.common.services.search.web_search import WebSearchGoogleTool, WebSearchTool
 
 
 def resolve_search_mode(api_keys: dict | None = None) -> str:
@@ -24,6 +23,8 @@ def describe_search_mode(api_keys: dict | None = None) -> str:
 
 
 def build_search_tools(api_keys: dict | None = None) -> list:
+    from backend.common.services.search.web_search import WebSearchGoogleTool, WebSearchTool
+
     keys = api_keys or {}
     serper_key = keys.get("serper_api_key") or settings.SERPER_API_KEY
     fallback = allow_search_fallback()

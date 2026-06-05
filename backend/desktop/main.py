@@ -19,11 +19,12 @@ from backend.common.config import AppMode, settings
 from backend.common.database import create_db_and_tables, engine
 from backend.common.logging import configure_logging
 from backend.common.services.auth.store import ensure_desktop_local_user
-from backend.desktop.preferences import get_theme_mode
+from backend.desktop.preferences import apply_llm_preferences_to_settings, get_theme_mode
 from backend.desktop.services.api_server import run_api_server
 from backend.desktop.theme import apply_app_theme, install_system_theme_listener
 from backend.desktop.ui.main_window import MainWindow
 from backend.desktop.ui.signal_bus import get_signal_bus
+from backend.desktop.workers.cron_digest import CronDigestWorker
 
 LOCAL_USER_EMAIL = "local@desktop"
 LOCAL_USER_NAME = "Desktop User"
@@ -60,6 +61,7 @@ def start_api_server(preferred_port: int = 12345):
 
 def main() -> None:
     settings.configure()
+    apply_llm_preferences_to_settings()
     configure_logging(settings.APP_MODE.value)
 
     app = QApplication(sys.argv)
@@ -75,6 +77,9 @@ def main() -> None:
 
     create_db_and_tables()
     user_id = ensure_local_user()
+    cron_worker = CronDigestWorker()
+    cron_worker.start()
+    app.aboutToQuit.connect(cron_worker.stop)
 
     ingestion_queue = None
     status_queue = None

@@ -23,7 +23,7 @@ Lumeward now supports two web auth modes.
 - Desktop bridge:
   - loopback only
   - protected with a runtime-generated bridge token header
-- Agent tools:
+- External network tools:
   - network actions are filtered through a security policy layer
   - non-approved actions are denied and logged
 
@@ -37,6 +37,7 @@ Lumeward now supports two web auth modes.
 - Bridge token validation on `/ingest`
 - Structured security-policy audit logging
 - Clipboard collection opt-in
+- Desktop telemetry disabled by default unless the user opts in
 - Raw clipboard text disabled by default
 - Tool/network policy checks before external search requests
 

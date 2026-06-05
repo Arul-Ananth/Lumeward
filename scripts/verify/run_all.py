@@ -5,7 +5,7 @@ from pathlib import Path
 
 def main() -> int:
     root = Path(__file__).resolve().parent
-    scripts = sorted(p for p in root.glob("*.py") if p.name != "run_all.py")
+    scripts = sorted(p for p in root.glob("*.py") if p.name != "run_all.py" and not p.name.startswith("_"))
 
     results: list[tuple[str, int]] = []
     for script in scripts:

@@ -73,7 +73,7 @@ class WebSearchTool(BaseTool):
     def _duckduckgo_scrape(self, query: str) -> str:
         try:
             import trafilatura
-            DDGS, search_kwargs = _load_fallback_search_client()
+            DDGS, backend_options = _load_fallback_search_client()
         except Exception as exc:
             return f"Fallback search unavailable: {exc}"
 
@@ -83,19 +83,29 @@ class WebSearchTool(BaseTool):
             return f"Search blocked by security policy: {discovery_decision.reason}"
 
         try:
-            ddgs = DDGS(timeout=10)
-            try:
-                with warnings.catch_warnings():
-                    warnings.filterwarnings(
-                        "ignore",
-                        message=r"This package \(`duckduckgo_search`\) has been renamed to `ddgs`!.*",
-                        category=RuntimeWarning,
-                    )
-                    results = list(ddgs.text(query, max_results=5, **search_kwargs))
-            finally:
-                close = getattr(ddgs, "close", None)
-                if callable(close):
-                    close()
+            results = []
+            errors = []
+            for search_kwargs in backend_options:
+                ddgs = DDGS(timeout=10)
+                try:
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings(
+                            "ignore",
+                            message=r"This package \(`duckduckgo_search`\) has been renamed to `ddgs`!.*",
+                            category=RuntimeWarning,
+                        )
+                        results = list(ddgs.text(query, max_results=5, **search_kwargs))
+                except Exception as exc:
+                    errors.append(f"{search_kwargs}: {exc}")
+                finally:
+                    close = getattr(ddgs, "close", None)
+                    if callable(close):
+                        close()
+                if results:
+                    break
+            if not results:
+                detail = "; ".join(errors) if errors else "No results."
+                return f"Error executing fallback search: {detail}"
         except Exception as exc:
             return f"Error executing fallback search: {exc}"
 
@@ -110,7 +120,11 @@ class WebSearchTool(BaseTool):
                 texts.append(text[:4000])
 
         if not texts:
-            return "No extractable content."
+            snippets = [
+                f"- {item.get('title', '')}: {item.get('body') or item.get('snippet', '')}"
+                for item in results[:3]
+            ]
+            return "\n".join(line for line in snippets if line.strip(" -:"))
         return "\n\n".join(texts)
 
     def _fetch_and_extract(self, url: str, trafilatura_module, query: str) -> str:
@@ -138,11 +152,15 @@ def _load_fallback_search_client():
     try:
         from ddgs import DDGS
 
-        return DDGS, {"backend": "duckduckgo"}
+        return DDGS, [
+            {"backend": "duckduckgo"},
+            {"backend": "html"},
+            {"backend": "lite"},
+        ]
     except Exception as ddgs_exc:
         try:
             from duckduckgo_search import DDGS
 
-            return DDGS, {"backend": "html"}
+            return DDGS, [{"backend": "html"}]
         except Exception as legacy_exc:
             raise RuntimeError(f"ddgs import failed: {ddgs_exc}; duckduckgo_search import failed: {legacy_exc}")

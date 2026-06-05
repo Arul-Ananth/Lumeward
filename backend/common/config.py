@@ -6,6 +6,8 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from backend.common.version import APP_VERSION
+
 DEFAULT_DATA_DIR = Path("./data")
 
 
@@ -32,9 +34,10 @@ class Settings(BaseSettings):
     TRUSTED_LAN_USER_EMAIL: str = "local@lan"
     TRUSTED_LAN_USER_NAME: str = "Trusted LAN User"
     AUTH_SESSION_EXPIRE_MINUTES: int = 720
+    APP_VERSION: str = APP_VERSION
 
     # AI / External Services
-    LLM_PROVIDER: str | None = None
+    LLM_PROVIDER: str | None = "ollama"
     OPENAI_API_BASE: str = ""
     OPENAI_MODEL_NAME: str = "mistral:latest"
     OPENAI_API_KEY: str = ""
@@ -52,7 +55,7 @@ class Settings(BaseSettings):
     DATA_DIR: Path = DEFAULT_DATA_DIR
 
     # Desktop Data Collection
-    DATA_COLLECTION_ENABLED: bool = True
+    DATA_COLLECTION_ENABLED: bool = False
     CLIPBOARD_COLLECTION_ENABLED: bool = False
     CLIPBOARD_STORE_RAW_TEXT: bool = False
     CLIPBOARD_MAX_CHARS: int = 50000
@@ -114,6 +117,11 @@ class Settings(BaseSettings):
             if appdata:
                 return Path(appdata) / "Lumeward"
             return Path.home() / "AppData" / "Roaming" / "Lumeward"
+        if sys.platform == "darwin":
+            return Path.home() / "Library" / "Application Support" / "Lumeward"
+        xdg_data_home = os.environ.get("XDG_DATA_HOME")
+        if xdg_data_home:
+            return Path(xdg_data_home) / "Lumeward"
         return Path.home() / ".local" / "share" / "Lumeward"
 
     def configure(self) -> None:

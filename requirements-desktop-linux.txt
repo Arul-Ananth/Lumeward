@@ -1,9 +1,6 @@
 -r requirements-desktop.txt
 
 # Linux / WSL desktop extras
-# Required when .env uses LLM_PROVIDER=google with CrewAI's native Gemini provider.
-crewai[google-genai]
-
 # Keyring backends for Linux developer environments.
 # secretstorage uses the recommended Freedesktop Secret Service path when available.
 # keyrings.alt provides a fallback backend for environments like WSL where no recommended backend is present.

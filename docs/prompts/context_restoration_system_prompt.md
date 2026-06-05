@@ -26,7 +26,7 @@ Lumeward is a hybrid AI brief assistant with two runtime modes built on a shared
   - Desktop UI is organized into `Ask`, `Guide`, `Run`, and `Result` sections.
   - Desktop settings include appearance control with `system`, `dark`, and `light` theme modes.
 
-The app uses CrewAI agents to research a topic and produce a short Markdown brief or newsletter-style output.
+The app uses a dedicated newsletter curation pipeline that can call CrewAI agents to research a topic and produce Markdown plus safe HTML digest output.
 
 ## 3. Assistant Role and Boundaries
 
@@ -81,7 +81,9 @@ Service domains:
 - `backend/common/services/auth/`
   - Password hashing and auth/session helpers.
 - `backend/common/services/llm/`
-  - LLM provider factory, search-tool policy, CrewAI construction, brief orchestration.
+  - LLM provider factory, search-tool policy, CrewAI construction, and compatibility wrappers.
+- `backend/common/services/newsletter/`
+  - Active newsletter pipeline, built-in templates, Markdown/HTML compiler, digest persistence helpers.
 - `backend/common/services/memory/`
   - Memory sanitizer and vector DB helpers, including recent clipboard retrieval.
 - `backend/common/services/search/`
@@ -114,6 +116,14 @@ Routes:
 - `POST /auth/signup`
 - `POST /auth/login`
 - `POST /news/generate`
+- `GET /news/history`
+- `GET /news/history/{digest_id}`
+- `POST /news/history/{digest_id}/archive`
+- `GET /news/templates`
+- `GET /news/schedules`
+- `POST /news/schedules`
+- `PATCH /news/schedules/{schedule_id}`
+- `DELETE /news/schedules/{schedule_id}`
 - `POST /news/feedback`
 - `GET /news/profile`
 - `GET /news/profile/{user_id}`
@@ -165,30 +175,36 @@ Current desktop behavior:
 - Exposes search mode and activity/status in the run section.
 - Supports result actions for copy, regenerate, clear, and save-as-markdown.
 
-## 8. LLM and Agent Pipeline
+## 8. Newsletter and LLM Pipeline
 
 Primary orchestration path:
 
-- `backend/common/services/llm/newsletter_service.py`
+- `backend/common/services/newsletter/pipeline.py`
 
 Supporting modules:
 
+- `backend/common/services/newsletter/templates.py`
+- `backend/common/services/newsletter/compiler.py`
 - `backend/common/services/llm/provider_factory.py`
 - `backend/common/services/llm/tool_policy.py`
 - `backend/common/services/llm/crew_builder.py`
-- `backend/common/services/llm/crew_agent.py`
+- `backend/common/services/llm/newsletter_service.py` (compatibility wrapper)
 
 Current behavior:
 
 - CrewAI researcher + writer flow.
 - Provider selected via `LLM_PROVIDER`, unless remote engine mode is enabled.
+- Remote engine mode uses `ENGINE_ENABLED=true`, `ENGINE_BASE_URL`, `ENGINE_API_KEY`, and `ENGINE_MODEL_NAME`.
+- Only sanitized prompt payloads should leave the Lumeward host for remote engine generation.
 - Supported direct provider values:
   - `ollama`
   - `openai`
   - `google`
 - Search tools are attached based on API keys and runtime mode.
+- Server DDG fallback is disabled unless `ALLOW_SERVER_DDG_FALLBACK=true`.
 - Memory context is retrieved from vector storage and sanitized before use.
 - Time-sensitive prompts are grounded to the runtime date.
+- Generated digests are persisted in SQLModel history when a session is supplied.
 
 ## 9. Search and Memory
 

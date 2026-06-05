@@ -1,7 +1,9 @@
-# Lumeward: OpenClaw-Style Capability Plan with Privacy and Security
+# Lumeward: Historical Capability Audit with Privacy and Security
 
 Date: 2026-03-16  
-Scope: Current repository implementation review + OpenClaw docs mapping + Python dependency standards audit.
+Scope: Historical repository implementation review + external security pattern mapping + Python dependency standards audit.
+
+Status: archived reference. This document is not the active Lumeward architecture plan. Active newsletter orchestration lives under `backend/common/services/newsletter/`, and Lumeward no longer uses a generic OpenClaw-style action execution surface as an active design target.
 
 ## 1) Current Lumeward Functionality (Implementation-Aligned)
 
@@ -23,8 +25,8 @@ Scope: Current repository implementation review + OpenClaw docs mapping + Python
   - `/news/generate`, `/news/feedback`, `/news/profile`, `/news/profile/{user_id}`.
   - In trusted LAN mode, dependency resolves a fixed trusted server user instead of JWT auth.
 
-### 1.3 LLM and agent flow
-- Newsletter generation (`backend/common/services/llm/newsletter_service.py`):
+### 1.3 LLM and newsletter flow
+- Newsletter generation (`backend/common/services/newsletter/pipeline.py`):
   - CrewAI researcher + writer tasks.
   - Supports provider switch through `LLM_PROVIDER` (`ollama`, `openai`, `google`).
   - Uses user context from vector memory (`vector_db.get_memory_context`).
@@ -60,9 +62,9 @@ Scope: Current repository implementation review + OpenClaw docs mapping + Python
 - API base URL is env-driven (`VITE_API_BASE_URL`) with localhost fallback.
 - Active LAN flow goes directly to the dashboard without browser auth.
 
-## 2) OpenClaw-Parity Recommendations (Privacy/Security-First)
+## 2) Historical External-Pattern Recommendations (Privacy/Security-First)
 
-OpenClaw docs emphasize treating AI actions as untrusted, strict isolation, and least privilege controls. To replicate that style in Lumeward while improving privacy:
+This section is retained as historical input only. Current Lumeward focuses on privacy-first newsletter curation, not a generic agent/action runtime.
 
 ### 2.1 Adopt an explicit zero-trust agent execution model (P0)
 - Treat agent tool execution as untrusted workload.
@@ -73,7 +75,7 @@ OpenClaw docs emphasize treating AI actions as untrusted, strict isolation, and 
 - Implement per-task execution policy object resolved before tool run.
 
 Suggested code area:
-- `backend/common/services/llm/newsletter_service.py` (tool invocation path)
+- `backend/common/services/newsletter/pipeline.py` (tool invocation path)
 - `backend/common/services/search/web_search.py` (network-bound tool runner)
 
 ### 2.2 Add hardened remote-access pattern (P0)
@@ -170,13 +172,13 @@ Status key: `Good`, `Partial`, `Needs Change`.
 ### P2
 1. Replace ad-hoc SQLite migration with migration tool (Alembic or SQLModel-compatible migration flow).
 2. Introduce structured event schema versioning for telemetry payloads.
-3. Split monolithic `newsletter_service.py` into:
+3. Continue the completed split from the old monolithic newsletter service into:
    - provider factory,
    - tool policy resolver,
    - crew task builder,
    - execution orchestrator.
 
-## 5) OpenClaw-Style Feature Parity Roadmap
+## 5) Historical Feature-Parity Roadmap
 
 ### Phase A: Security baseline parity
 - Policy engine for tool execution scope.
@@ -203,7 +205,7 @@ Status key: `Good`, `Partial`, `Needs Change`.
 
 ## 7) External References
 
-### OpenClaw
+### Historical external references
 - https://docs.openclaw.ai/docs/platform/security/
 - https://docs.openclaw.ai/docs/platform/core/sandboxing/
 - https://docs.openclaw.ai/docs/platform/gateway/remote/

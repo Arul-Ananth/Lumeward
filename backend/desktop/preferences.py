@@ -8,11 +8,15 @@ _ORG_NAME = "Lumeward"
 _APP_NAME = "Lumeward"
 
 _KEY_THEME_MODE = "ui/theme_mode"
+_KEY_LLM_PROVIDER = "llm/provider"
+_KEY_LLM_BASE_URL = "llm/base_url"
+_KEY_LLM_MODEL_NAME = "llm/model_name"
 _KEY_DATA_COLLECTION_ENABLED = "telemetry/data_collection_enabled"
 _KEY_CLIPBOARD_COLLECTION_ENABLED = "telemetry/clipboard_collection_enabled"
 _KEY_CLIPBOARD_STORE_RAW_TEXT = "telemetry/clipboard_store_raw_text"
 
 _VALID_THEME_MODES = {"system", "dark", "light"}
+_VALID_LLM_PROVIDERS = {"ollama", "openai", "google"}
 
 
 def _store() -> QSettings:
@@ -36,6 +40,19 @@ def _normalize_theme_mode(value: str | None) -> str:
     return mode if mode in _VALID_THEME_MODES else "system"
 
 
+def _normalize_llm_provider(value: str | None) -> str:
+    if not value:
+        return "ollama"
+    provider = value.strip().lower()
+    return provider if provider in _VALID_LLM_PROVIDERS else "ollama"
+
+
+def apply_llm_preferences_to_settings() -> None:
+    settings.LLM_PROVIDER = get_llm_provider()
+    settings.OPENAI_API_BASE = get_llm_base_url()
+    settings.OPENAI_MODEL_NAME = get_llm_model_name()
+
+
 def get_theme_mode() -> str:
     raw = _store().value(_KEY_THEME_MODE, "system")
     return _normalize_theme_mode(raw if isinstance(raw, str) else str(raw))
@@ -43,6 +60,36 @@ def get_theme_mode() -> str:
 
 def set_theme_mode(mode: str) -> None:
     _store().setValue(_KEY_THEME_MODE, _normalize_theme_mode(mode))
+
+
+def get_llm_provider() -> str:
+    raw = _store().value(_KEY_LLM_PROVIDER, settings.LLM_PROVIDER or "ollama")
+    return _normalize_llm_provider(raw if isinstance(raw, str) else str(raw))
+
+
+def set_llm_provider(provider: str) -> None:
+    _store().setValue(_KEY_LLM_PROVIDER, _normalize_llm_provider(provider))
+
+
+def get_llm_base_url() -> str:
+    default = settings.OPENAI_API_BASE or "http://localhost:11434"
+    raw = _store().value(_KEY_LLM_BASE_URL, default)
+    value = raw if isinstance(raw, str) else str(raw)
+    return value.strip() or default
+
+
+def set_llm_base_url(base_url: str) -> None:
+    _store().setValue(_KEY_LLM_BASE_URL, base_url.strip() or "http://localhost:11434")
+
+
+def get_llm_model_name() -> str:
+    raw = _store().value(_KEY_LLM_MODEL_NAME, settings.OPENAI_MODEL_NAME or "mistral:latest")
+    value = raw if isinstance(raw, str) else str(raw)
+    return value.strip() or "mistral:latest"
+
+
+def set_llm_model_name(model_name: str) -> None:
+    _store().setValue(_KEY_LLM_MODEL_NAME, model_name.strip() or "mistral:latest")
 
 
 def get_data_collection_enabled() -> bool:

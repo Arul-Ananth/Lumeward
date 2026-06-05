@@ -5,12 +5,14 @@ from datetime import datetime
 
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QToolBar
+from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox, QToolBar
 
+from backend.common.config import settings
 from backend.common.services.llm.tool_policy import describe_search_mode, resolve_search_mode
 from backend.desktop.preferences import get_theme_mode
 from backend.desktop.security import get_secret
 from backend.desktop.services.ai_worker import AIWorker
+from backend.desktop.services.ollama_runtime import ping_ollama, start_ollama
 from backend.desktop.services.ocr_worker import OCRWorker
 from backend.desktop.telemetry_manager import TelemetryManager
 from backend.desktop.theme import apply_app_theme
@@ -53,6 +55,8 @@ class MainWindow(QMainWindow):
         self._ocr_worker: OCRWorker | None = None
         self._context_fragments: list[str] = []
         self._has_result = False
+        self._generation_error_pending = False
+        self._ollama_checked = False
 
         self.setWindowTitle("Lumeward")
         self.resize(980, 780)
@@ -134,6 +138,9 @@ class MainWindow(QMainWindow):
             self.show_status("Generation already running.")
             return
 
+        if not self._confirm_ollama_ready():
+            return
+
         self.telemetry.flush_output_time()
         self.telemetry.emit_generation(topic, context)
 
@@ -141,6 +148,7 @@ class MainWindow(QMainWindow):
         self._append_activity(f"Starting brief generation for: {topic}")
         self.output_area.clear()
         self._has_result = False
+        self._generation_error_pending = False
         self._set_result_placeholder(f"Starting research on '{topic}'... This may take a minute.")
 
         api_keys = self._current_api_keys()
@@ -158,6 +166,7 @@ class MainWindow(QMainWindow):
         self._ai_worker.progress_update.connect(self.signal_bus.progress_update)
         self._ai_worker.status_message.connect(self.signal_bus.status_message)
         self._ai_worker.result_ready.connect(self.signal_bus.result_ready)
+        self._ai_worker.error_message.connect(self.on_ai_error)
         self._ai_worker.finished.connect(self.on_ai_finished)
         self._ai_worker.start()
         self._update_action_states()
@@ -196,8 +205,12 @@ class MainWindow(QMainWindow):
                 grounded=self._is_current_date_grounded(topic),
             )
             self._has_result = True
+            self._generation_error_pending = False
             self.show_status("Result ready.")
         else:
+            if self._generation_error_pending:
+                self._update_action_states()
+                return
             self._has_result = False
             self._set_result_placeholder("No output generated.")
             self._update_result_metadata(
@@ -206,6 +219,21 @@ class MainWindow(QMainWindow):
                 state="No result",
                 grounded=self._is_current_date_grounded(self.topic_input.text().strip()),
             )
+        self._update_action_states()
+
+    def on_ai_error(self, message: str) -> None:
+        topic = self.topic_input.text().strip()
+        search_mode = resolve_search_mode(api_keys=self._current_api_keys())
+        self._has_result = False
+        self._generation_error_pending = True
+        self._set_result_placeholder(message)
+        self._append_activity(message)
+        self._update_result_metadata(
+            topic,
+            search_mode=search_mode,
+            state="Error",
+            grounded=self._is_current_date_grounded(topic),
+        )
         self._update_action_states()
 
     def on_ai_finished(self) -> None:
@@ -409,8 +437,79 @@ class MainWindow(QMainWindow):
     def _current_api_keys(self) -> dict[str, str | None]:
         return {
             "openai_api_key": get_secret("openai_api_key"),
+            "gemini_api_key": get_secret("gemini_api_key"),
             "serper_api_key": get_secret("serper_api_key"),
         }
+
+    def _confirm_ollama_ready(self) -> bool:
+        if settings.ENGINE_ENABLED or (settings.LLM_PROVIDER or "").strip().lower() != "ollama":
+            return True
+        if self._ollama_checked:
+            return True
+
+        response = QMessageBox.question(
+            self,
+            "Check Ollama",
+            (
+                "Lumeward uses Ollama by default for local generation.\n\n"
+                f"It can check `{settings.OPENAI_API_BASE or 'http://localhost:11434'}` before generating. "
+                "This sends only a local health request and does not send your prompt.\n\n"
+                "Check Ollama now?"
+            ),
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
+        )
+        if response == QMessageBox.Cancel:
+            return False
+        if response == QMessageBox.No:
+            self._ollama_checked = True
+            return True
+
+        check = ping_ollama(settings.OPENAI_API_BASE)
+        if check.ok:
+            self._ollama_checked = True
+            self._append_activity(check.message)
+            self.show_status("Ollama is reachable.")
+            return True
+
+        start_response = QMessageBox.question(
+            self,
+            "Ollama Not Reachable",
+            (
+                f"{check.message}\n\n"
+                "Lumeward can try to run `ollama serve` for this session. "
+                "No admin permission is requested.\n\n"
+                "Try to start Ollama?"
+            ),
+            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
+            QMessageBox.Yes,
+        )
+        if start_response == QMessageBox.Cancel:
+            return False
+        if start_response == QMessageBox.No:
+            self._ollama_checked = True
+            return True
+
+        started = start_ollama()
+        self._append_activity(started.message)
+        if not started.ok:
+            QMessageBox.warning(self, "Ollama", started.message)
+            return True
+
+        retry = ping_ollama(settings.OPENAI_API_BASE, timeout_seconds=5.0)
+        self._append_activity(retry.message)
+        if retry.ok:
+            self._ollama_checked = True
+            self.show_status("Ollama is reachable.")
+            return True
+
+        QMessageBox.warning(
+            self,
+            "Ollama",
+            f"{retry.message}\n\nGeneration may still fail until Ollama is running and the model is available.",
+        )
+        self._ollama_checked = True
+        return True
 
     def _update_runtime_summary(self, *, search_mode: str | None = None) -> None:
         resolved_search_mode = search_mode or resolve_search_mode(api_keys=self._current_api_keys())

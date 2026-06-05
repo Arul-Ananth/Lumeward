@@ -1,14 +1,14 @@
 import asyncio
-import sys
-from pathlib import Path
 
-root = Path(__file__).resolve().parents[2]
-if str(root) not in sys.path:
-    sys.path.append(str(root))
+from _bootstrap import setup_project_path, use_temp_data_dir
+
+setup_project_path()
+tmp = use_temp_data_dir()
 
 from backend.common.config import AppMode, settings
 from backend.common.database import create_db_and_tables
-from backend.common.services.llm.newsletter_service import newsletter_service
+from backend.common.services.memory import vector_db
+from backend.common.services.newsletter.pipeline import newsletter_pipeline
 
 
 async def main() -> None:
@@ -27,12 +27,10 @@ async def main() -> None:
         return
 
     print("Testing Newsletter Service (mocked)...")
-    original_run = newsletter_service._run_crew
-    newsletter_service._run_crew = lambda topic, context, api_keys, user_id, session_id: (
-        f"Mocked content for '{topic}'"
-    )
+    original_body = newsletter_pipeline._build_body
+    newsletter_pipeline._build_body = lambda *args, **kwargs: "Mocked content for 'Python Async'"
     try:
-        result = await newsletter_service.generate_newsletter("Python Async", user_id=1)
+        result = await newsletter_pipeline.generate_newsletter(topic="Python Async", user_id=1, persist=False)
         print(f"Success! Result: {result.content}")
     except Exception as exc:
         print(f"Service Error: {exc}")
@@ -40,7 +38,9 @@ async def main() -> None:
 
         traceback.print_exc()
     finally:
-        newsletter_service._run_crew = original_run
+        newsletter_pipeline._build_body = original_body
+        vector_db.client.close()
+        tmp.cleanup()
 
 
 if __name__ == "__main__":

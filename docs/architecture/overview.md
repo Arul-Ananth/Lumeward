@@ -2,6 +2,7 @@
 
 ## Runtime Modes
 
+- Current release target: `1.0.0-beta.1`.
 - `SERVER` mode runs FastAPI for web clients.
 - `DESKTOP` mode runs PySide6 + qasync with a local bridge and background telemetry runtime.
 - Runtime resolution is centralized in `backend/main.py` and follows:
@@ -19,7 +20,8 @@
   - SQLModel engine/session setup
 - `backend/common/services/`
   - `auth/` web identity/session helpers
-  - `llm/` provider factory, tool policy, crew builders, newsletter/brief orchestration
+  - `newsletter/` active newsletter curation pipeline, templates, compiler, history persistence
+  - `llm/` provider factory, tool policy, CrewAI builders, and compatibility wrappers
   - `memory/` vector and clipboard-history retrieval helpers
   - `search/` Serper and desktop fallback search
   - `telemetry/` consent, ingestion, workers, session/profile rollups
@@ -29,6 +31,7 @@
 - App factory lives in `backend/server/app.py`.
 - Web auth supports `trusted_lan` and `interactive` modes.
 - Remote OpenAI-compatible engine support is optional and stays behind the backend.
+- Remote engine mode sends only sanitized model-generation payloads to `ENGINE_BASE_URL`; auth, memory, telemetry, schedules, digest history, and vector storage stay on the Lumeward host.
 
 ### Desktop mode
 
@@ -50,8 +53,20 @@
 
 - Search mode resolves to `serper`, `fallback`, or `disabled`.
 - Desktop fallback search uses `ddgs` plus extraction.
+- Server fallback search is disabled unless `ALLOW_SERVER_DDG_FALLBACK=true` is explicitly set.
 - Time-sensitive prompts are grounded to runtime date context.
 - Clipboard-history prompts use a direct recent-clipboard path before falling back to semantic memory.
+
+### Newsletter curation
+
+- `backend/common/services/newsletter/pipeline.py` is the active orchestration entry point.
+- `templates.py` owns built-in newsletter templates.
+- `compiler.py` converts generated content into Markdown and minimal safe HTML.
+- `backend/common/services/llm/newsletter_service.py` is a compatibility wrapper only.
+- SQLModel persistence covers templates, generated digests, and schedules.
+- `/news/generate` remains compatible with the frontend and persists generated digests.
+- `/news/history`, `/news/templates`, and `/news/schedules` expose the new history/template/schedule surface.
+- `/news/sources` exposes metadata-only placeholders for future source integrations in Beta 1.0; no plugin execution or ingestion is active.
 
 ### Desktop bridge
 
@@ -62,6 +77,7 @@
 ## Service Layer Conventions
 
 - Keep orchestration modules thin and composable.
+- Keep newsletter orchestration under `services/newsletter/`.
 - Keep provider-specific logic isolated under `services/llm/`.
 - Keep storage/memory code isolated under `services/memory/`.
 - Keep external network tools isolated under `services/search/`.

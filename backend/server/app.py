@@ -8,6 +8,7 @@ from sqlmodel import Session
 
 from backend.common.config import settings
 from backend.common.database import create_db_and_tables, engine
+from backend.common.version import APP_VERSION
 from backend.common.services.auth.store import ensure_trusted_lan_user
 from backend.server.routers import auth, news
 
@@ -22,7 +23,7 @@ async def lifespan(_: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Lumeward Server", lifespan=lifespan)
+    app = FastAPI(title="Lumeward Server", version=APP_VERSION, lifespan=lifespan)
     app.include_router(auth.router, prefix="/auth")
     app.include_router(news.router, prefix="/news")
     app.add_middleware(

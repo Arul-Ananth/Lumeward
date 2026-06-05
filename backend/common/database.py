@@ -47,6 +47,23 @@ def _migration_002_backfill_auth_identities(conn) -> None:
         WHERE ai.id IS NULL
         """
     )
+
+
+def _migration_003_newsletter_curation_tables(conn) -> None:
+    if engine.dialect.name != "sqlite":
+        return
+    conn.exec_driver_sql(
+        """
+        CREATE INDEX IF NOT EXISTS ix_newsletterdigest_user_archived_created
+        ON newsletterdigest(user_id, archived, created_at)
+        """
+    )
+    conn.exec_driver_sql(
+        """
+        CREATE INDEX IF NOT EXISTS ix_newsletterschedule_user_enabled_time
+        ON newsletterschedule(user_id, enabled, local_time)
+        """
+    )
     conn.exec_driver_sql(
         """
         INSERT INTO userwallet (user_id, balance)
@@ -61,6 +78,7 @@ def _migration_002_backfill_auth_identities(conn) -> None:
 MIGRATIONS: list[Migration] = [
     ("001_add_derivedmemory_user_id", _migration_001_add_derivedmemory_user_id),
     ("002_backfill_auth_identities", _migration_002_backfill_auth_identities),
+    ("003_newsletter_curation_tables", _migration_003_newsletter_curation_tables),
 ]
 
 

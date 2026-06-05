@@ -61,14 +61,14 @@ clipboard change
 
 ### Why this fails
 
-- `newsletter_service` uses `get_memory_context(user_id, topic, session_id)`.
+- The newsletter pipeline uses `get_memory_context(user_id, topic, session_id)`.
 - Memory retrieval is semantic similarity on the user query string, not deterministic recent clipboard lookup.
 - A query like `tell me what i know about langchain from my clipboard history` will match older stored content if that content is semantically stronger than the recent clipboard text.
 - Clipboard text also gets truncated in session summaries.
 
 Relevant files:
 
-- [backend/common/services/llm/newsletter_service.py](C:/Dev/lumeward/backend/common/services/llm/newsletter_service.py)
+- [backend/common/services/newsletter/pipeline.py](C:/Dev/lumeward/backend/common/services/newsletter/pipeline.py)
 - [backend/common/services/memory/vector_db.py](C:/Dev/lumeward/backend/common/services/memory/vector_db.py)
 - [backend/common/services/telemetry/workers.py](C:/Dev/lumeward/backend/common/services/telemetry/workers.py)
 
