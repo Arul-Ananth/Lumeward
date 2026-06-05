@@ -89,19 +89,17 @@ def build_main_window_content() -> MainWindowWidgets:
     guide_layout.addWidget(attached_context_area)
     root_layout.addWidget(guide_box)
 
-    run_box, run_layout = _build_section("Run")
     status_label = QLabel("Idle")
+    status_label.hide()
     status_label.setWordWrap(True)
     capability_label = QLabel("Search unavailable")
+    capability_label.hide()
     capability_label.setWordWrap(True)
-    run_layout.addWidget(status_label)
-    run_layout.addWidget(capability_label)
 
     generate_btn = QPushButton("Generate Brief")
     generate_btn.setObjectName("primaryButton")
     generate_btn.setMinimumHeight(40)
-    run_layout.addWidget(generate_btn)
-    root_layout.addWidget(run_box)
+    root_layout.addWidget(generate_btn)
 
     result_box, result_layout = _build_section("Result")
     result_meta_label = QLabel("No result")
