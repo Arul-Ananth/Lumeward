@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QPushButton, QTextEdit, QVBoxLayout, QWidget
 
 
 class CollapsibleLogWidget(QWidget):
-    def __init__(self, title: str = "Execution Messages", parent=None) -> None:
+    def __init__(self, title: str = "Log", parent=None) -> None:
         super().__init__(parent)
         self._collapsed = True
 

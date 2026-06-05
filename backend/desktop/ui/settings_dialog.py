@@ -39,6 +39,23 @@ from backend.desktop.preferences import (
 from backend.desktop.security import delete_secret, get_secret, set_secret
 
 
+def _group(title: str) -> tuple[QGroupBox, QVBoxLayout]:
+    box = QGroupBox(title)
+    return box, QVBoxLayout(box)
+
+
+def _line_input(value: str = "") -> QLineEdit:
+    field = QLineEdit()
+    field.setText(value)
+    return field
+
+
+def _secret_input(secret_key: str) -> QLineEdit:
+    field = _line_input(get_secret(secret_key) or "")
+    field.setEchoMode(QLineEdit.Password)
+    return field
+
+
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, on_saved=None, bridge_status: str = "Unavailable"):
         super().__init__(parent)
@@ -61,7 +78,7 @@ class SettingsDialog(QDialog):
         appearance_group = QGroupBox("Appearance")
         appearance_layout = QFormLayout(appearance_group)
         self.theme_mode_input = QComboBox()
-        self.theme_mode_input.addItem("System Default", "system")
+        self.theme_mode_input.addItem("System", "system")
         self.theme_mode_input.addItem("Dark", "dark")
         self.theme_mode_input.addItem("Light", "light")
         saved_theme_mode = get_theme_mode()
@@ -73,72 +90,59 @@ class SettingsDialog(QDialog):
         llm_group = QGroupBox("LLM")
         llm_layout = QFormLayout(llm_group)
         self.provider_input = QComboBox()
-        self.provider_input.addItem("Ollama (local)", "ollama")
+        self.provider_input.addItem("Ollama", "ollama")
         self.provider_input.addItem("OpenAI compatible", "openai")
         self.provider_input.addItem("Google Gemini", "google")
         provider_index = max(self.provider_input.findData(get_llm_provider()), 0)
         self.provider_input.setCurrentIndex(provider_index)
         llm_layout.addRow("Provider", self.provider_input)
 
-        self.base_url_input = QLineEdit()
-        self.base_url_input.setText(get_llm_base_url())
+        self.base_url_input = _line_input(get_llm_base_url())
         llm_layout.addRow("Base URL", self.base_url_input)
 
-        self.model_input = QLineEdit()
-        self.model_input.setText(get_llm_model_name())
+        self.model_input = _line_input(get_llm_model_name())
         llm_layout.addRow("Model", self.model_input)
         content_layout.addWidget(llm_group)
 
-        api_group = QGroupBox("API Keys")
-        api_layout = QVBoxLayout(api_group)
-        api_layout.addWidget(QLabel("OpenAI API Key (Optional):"))
-        self.openai_input = QLineEdit()
-        self.openai_input.setEchoMode(QLineEdit.Password)
-        self.openai_input.setText(get_secret("openai_api_key") or "")
+        api_group, api_layout = _group("API Keys")
+        api_layout.addWidget(QLabel("OpenAI API Key"))
+        self.openai_input = _secret_input("openai_api_key")
         api_layout.addWidget(self.openai_input)
 
-        api_layout.addWidget(QLabel("Google Gemini API Key (Optional):"))
-        self.gemini_input = QLineEdit()
-        self.gemini_input.setEchoMode(QLineEdit.Password)
-        self.gemini_input.setText(get_secret("gemini_api_key") or "")
+        api_layout.addWidget(QLabel("Google Gemini API Key"))
+        self.gemini_input = _secret_input("gemini_api_key")
         api_layout.addWidget(self.gemini_input)
 
-        api_layout.addWidget(QLabel("Serper API Key (For Web Search):"))
-        self.serper_input = QLineEdit()
-        self.serper_input.setEchoMode(QLineEdit.Password)
-        self.serper_input.setText(get_secret("serper_api_key") or "")
+        api_layout.addWidget(QLabel("Serper API Key"))
+        self.serper_input = _secret_input("serper_api_key")
         api_layout.addWidget(self.serper_input)
         content_layout.addWidget(api_group)
 
-        bridge_group = QGroupBox("Browser Bridge")
-        bridge_layout = QVBoxLayout(bridge_group)
+        bridge_group, bridge_layout = _group("Browser Bridge")
         bridge_label = QLabel(bridge_status)
         bridge_label.setWordWrap(True)
         bridge_layout.addWidget(bridge_label)
         content_layout.addWidget(bridge_group)
 
-        ingestion_group = QGroupBox("Ingestion")
-        ingestion_layout = QVBoxLayout(ingestion_group)
-        ingestion_layout.addWidget(QLabel("Watched Folders (opt-in for ingestion):"))
-        self.add_folder_btn = QPushButton("Add Folder to Watch")
+        ingestion_group, ingestion_layout = _group("Ingestion")
+        self.add_folder_btn = QPushButton("Add Folder")
         self.add_folder_btn.clicked.connect(self.add_folder)
         ingestion_layout.addWidget(self.add_folder_btn)
         content_layout.addWidget(ingestion_group)
 
-        privacy_group = QGroupBox("Privacy")
-        privacy_layout = QVBoxLayout(privacy_group)
+        privacy_group, privacy_layout = _group("Privacy")
 
-        self.data_collection_checkbox = QCheckBox("Enable desktop telemetry data collection")
+        self.data_collection_checkbox = QCheckBox("Telemetry")
         self.data_collection_checkbox.setChecked(get_data_collection_enabled())
         self.data_collection_checkbox.toggled.connect(self._on_data_collection_toggled)
         privacy_layout.addWidget(self.data_collection_checkbox)
 
-        self.clipboard_collection_checkbox = QCheckBox("Enable clipboard collection (opt-in)")
+        self.clipboard_collection_checkbox = QCheckBox("Clipboard")
         self.clipboard_collection_checkbox.setChecked(get_clipboard_collection_enabled())
         self.clipboard_collection_checkbox.toggled.connect(self._on_clipboard_collection_toggled)
         privacy_layout.addWidget(self.clipboard_collection_checkbox)
 
-        self.clipboard_raw_checkbox = QCheckBox("Store raw clipboard text (higher sensitivity)")
+        self.clipboard_raw_checkbox = QCheckBox("Raw clipboard text")
         self.clipboard_raw_checkbox.setChecked(get_clipboard_store_raw_text_enabled())
         privacy_layout.addWidget(self.clipboard_raw_checkbox)
         content_layout.addWidget(privacy_group)

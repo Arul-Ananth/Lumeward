@@ -20,11 +20,11 @@ from PySide6.QtWidgets import (
 from backend.desktop.ui.collapsible_log_widget import CollapsibleLogWidget
 
 PRESET_GUIDANCE: dict[str, str] = {
-    "For beginners": "Write for beginners.",
+    "Beginner": "Write for beginners.",
     "5 bullets": "Format the answer as 5 concise bullets.",
-    "Executive tone": "Use an executive-brief tone.",
-    "Only today": "Focus only on items from today and cite the date explicitly.",
-    "Avoid sports": "Exclude sports coverage.",
+    "Executive": "Use an executive-brief tone.",
+    "Today": "Focus only on items from today and cite the date explicitly.",
+    "No sports": "Exclude sports coverage.",
 }
 
 
@@ -61,17 +61,15 @@ def build_main_window_content() -> MainWindowWidgets:
     root_layout.setSpacing(12)
     root_layout.setContentsMargins(14, 14, 14, 14)
 
-    ask_box, ask_layout = _build_section("Ask")
-    ask_layout.addWidget(QLabel("Topic / Query"))
+    ask_box, ask_layout = _build_section("Brief")
     topic_input = QLineEdit()
-    topic_input.setPlaceholderText("Example: current world events, AI regulation, or what did I just copy")
+    topic_input.setPlaceholderText("Topic")
     ask_layout.addWidget(topic_input)
     root_layout.addWidget(ask_box)
 
-    guide_box, guide_layout = _build_section("Guide")
-    guide_layout.addWidget(QLabel("Optional Guidance: add audience, scope, tone, format, or exclusions."))
+    guide_box, guide_layout = _build_section("Guidance")
     guidance_input = QTextEdit()
-    guidance_input.setPlaceholderText("Example: for beginners, 5 bullets, focus on Europe, neutral tone.")
+    guidance_input.setPlaceholderText("Audience, scope, tone, format")
     guidance_input.setMaximumHeight(110)
     guide_layout.addWidget(guidance_input)
 
@@ -84,18 +82,17 @@ def build_main_window_content() -> MainWindowWidgets:
         preset_buttons[label] = button
     guide_layout.addLayout(presets_layout)
 
-    guide_layout.addWidget(QLabel("Attached Context"))
     attached_context_area = QTextEdit()
     attached_context_area.setReadOnly(True)
-    attached_context_area.setPlaceholderText("Bridge URLs, OCR text, and other attached context will appear here.")
+    attached_context_area.setPlaceholderText("Attached context")
     attached_context_area.setMaximumHeight(110)
     guide_layout.addWidget(attached_context_area)
     root_layout.addWidget(guide_box)
 
     run_box, run_layout = _build_section("Run")
-    status_label = QLabel("Status: Idle")
+    status_label = QLabel("Idle")
     status_label.setWordWrap(True)
-    capability_label = QLabel("Search: Unknown")
+    capability_label = QLabel("Search unavailable")
     capability_label.setWordWrap(True)
     run_layout.addWidget(status_label)
     run_layout.addWidget(capability_label)
@@ -107,7 +104,7 @@ def build_main_window_content() -> MainWindowWidgets:
     root_layout.addWidget(run_box)
 
     result_box, result_layout = _build_section("Result")
-    result_meta_label = QLabel("No result generated yet.")
+    result_meta_label = QLabel("No result")
     result_meta_label.setWordWrap(True)
     result_meta_label.setStyleSheet("padding: 6px; border-radius: 6px;")
     result_layout.addWidget(result_meta_label)
@@ -116,7 +113,7 @@ def build_main_window_content() -> MainWindowWidgets:
     regenerate_btn = QPushButton("Regenerate")
     copy_btn = QPushButton("Copy")
     clear_btn = QPushButton("Clear")
-    save_btn = QPushButton("Save as Markdown")
+    save_btn = QPushButton("Save")
     for button in (regenerate_btn, copy_btn, clear_btn, save_btn):
         result_actions.addWidget(button)
     result_actions.addStretch(1)
@@ -127,7 +124,7 @@ def build_main_window_content() -> MainWindowWidgets:
     output_area.setReadOnly(True)
     output_area.setOpenExternalLinks(False)
     output_area.setMinimumHeight(320)
-    output_area.setPlaceholderText("Your generated brief will appear here.")
+    output_area.setPlaceholderText("Generated brief")
     result_layout.addWidget(output_area, 1)
 
     log_widget = CollapsibleLogWidget()

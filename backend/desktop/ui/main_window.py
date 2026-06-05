@@ -3,22 +3,22 @@ import queue as std_queue
 import time
 from datetime import datetime
 
-from backend.common.services.newsletter.compiler import compile_html
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QMessageBox, QToolBar
+from PySide6.QtWidgets import QApplication, QFileDialog, QMainWindow, QToolBar
 
 from backend.common.config import settings
 from backend.common.services.llm.tool_policy import describe_search_mode, resolve_search_mode
 from backend.desktop.preferences import get_theme_mode
 from backend.desktop.security import get_secret
 from backend.desktop.services.ai_worker import AIWorker
-from backend.desktop.services.ollama_runtime import ping_ollama, start_ollama
 from backend.desktop.services.ocr_worker import OCRWorker
 from backend.desktop.telemetry_manager import TelemetryManager
 from backend.desktop.theme import apply_app_theme
+from backend.desktop.ui.digest_renderer import render_digest_html
 from backend.desktop.ui.global_hotkey import GlobalHotkeyManager
 from backend.desktop.ui.main_window_view import PRESET_GUIDANCE, build_main_window_content
+from backend.desktop.ui.ollama_dialogs import confirm_ollama_ready
 from backend.desktop.ui.overlay import ScreenSnipperOverlay
 from backend.desktop.ui.settings_dialog import SettingsDialog
 from backend.desktop.ui.signal_bus import get_signal_bus
@@ -133,7 +133,7 @@ class MainWindow(QMainWindow):
         context = self._compose_context()
 
         if not topic:
-            self.show_status("Please enter a topic / query.")
+            self.show_status("Enter a topic.")
             return
 
         if self._ai_worker and self._ai_worker.isRunning():
@@ -187,7 +187,7 @@ class MainWindow(QMainWindow):
 
     def show_status(self, message: str) -> None:
         self.statusBar().showMessage(message, 5000)
-        self.ui.status_label.setText(f"Status: {message}")
+        self.ui.status_label.setText(message)
 
     def log_message(self, message: str) -> None:
         self._append_activity(message)
@@ -198,7 +198,7 @@ class MainWindow(QMainWindow):
     def on_ai_result(self, result: str) -> None:
         if result:
             self._current_markdown = result
-            self.output_area.setHtml(_digest_html(result))
+            self.output_area.setHtml(render_digest_html(result))
             self.telemetry.mark_output_start()
             topic = self.topic_input.text().strip()
             search_mode = resolve_search_mode(api_keys=self._current_api_keys())
@@ -453,70 +453,14 @@ class MainWindow(QMainWindow):
             return True
         if self._ollama_checked:
             return True
-
-        response = QMessageBox.question(
+        ready = confirm_ollama_ready(
             self,
-            "Check Ollama",
-            (
-                "Lumeward uses Ollama by default for local generation.\n\n"
-                f"It can check `{settings.OPENAI_API_BASE or 'http://localhost:11434'}` before generating. "
-                "This sends only a local health request and does not send your prompt.\n\n"
-                "Check Ollama now?"
-            ),
-            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
-            QMessageBox.Yes,
+            append_activity=self._append_activity,
+            show_status=self.show_status,
         )
-        if response == QMessageBox.Cancel:
-            return False
-        if response == QMessageBox.No:
+        if ready:
             self._ollama_checked = True
-            return True
-
-        check = ping_ollama(settings.OPENAI_API_BASE)
-        if check.ok:
-            self._ollama_checked = True
-            self._append_activity(check.message)
-            self.show_status("Ollama is reachable.")
-            return True
-
-        start_response = QMessageBox.question(
-            self,
-            "Ollama Not Reachable",
-            (
-                f"{check.message}\n\n"
-                "Lumeward can try to run `ollama serve` for this session. "
-                "No admin permission is requested.\n\n"
-                "Try to start Ollama?"
-            ),
-            QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel,
-            QMessageBox.Yes,
-        )
-        if start_response == QMessageBox.Cancel:
-            return False
-        if start_response == QMessageBox.No:
-            self._ollama_checked = True
-            return True
-
-        started = start_ollama()
-        self._append_activity(started.message)
-        if not started.ok:
-            QMessageBox.warning(self, "Ollama", started.message)
-            return True
-
-        retry = ping_ollama(settings.OPENAI_API_BASE, timeout_seconds=5.0)
-        self._append_activity(retry.message)
-        if retry.ok:
-            self._ollama_checked = True
-            self.show_status("Ollama is reachable.")
-            return True
-
-        QMessageBox.warning(
-            self,
-            "Ollama",
-            f"{retry.message}\n\nGeneration may still fail until Ollama is running and the model is available.",
-        )
-        self._ollama_checked = True
-        return True
+        return ready
 
     def _update_runtime_summary(self, *, search_mode: str | None = None) -> None:
         resolved_search_mode = search_mode or resolve_search_mode(api_keys=self._current_api_keys())
@@ -525,7 +469,7 @@ class MainWindow(QMainWindow):
             "fallback": "Fallback",
             "disabled": "Disabled",
         }.get(resolved_search_mode, resolved_search_mode.title())
-        self.ui.capability_label.setText(f"Search: {search_label}")
+        self.ui.capability_label.setText(search_label)
 
     def _bridge_status_text(self) -> str:
         if self._bridge_disabled:
@@ -545,7 +489,7 @@ class MainWindow(QMainWindow):
         grounded: bool = False,
     ) -> None:
         if not topic:
-            self.ui.result_meta_label.setText("No result generated yet.")
+            self.ui.result_meta_label.setText("No result")
             return
         search_label = {
             "serper": "Serper",
@@ -554,9 +498,8 @@ class MainWindow(QMainWindow):
             None: "Unknown",
         }[search_mode] if search_mode in {"serper", "fallback", "disabled"} or search_mode is None else search_mode
         generated_at = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S %Z")
-        grounded_text = "Yes" if grounded else "No"
         self.ui.result_meta_label.setText(
-            f"State: {state} | Generated: {generated_at} | Search: {search_label} | Current-date grounded: {grounded_text}"
+            f"{state} | {generated_at} | {search_label}"
         )
 
     def _current_output_markdown(self) -> str:
@@ -587,54 +530,3 @@ class MainWindow(QMainWindow):
         self.ui.copy_btn.setEnabled(has_output)
         self.ui.clear_btn.setEnabled(has_output)
         self.ui.save_btn.setEnabled(has_output)
-
-
-def _digest_html(markdown: str) -> str:
-    return f"""
-<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-body {{
-    background: #161617;
-    color: #e5e5ea;
-    font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 15px;
-    line-height: 1.62;
-    margin: 0;
-    padding: 26px 30px;
-}}
-h1 {{
-    color: #f5f5f7;
-    font-size: 25px;
-    font-weight: 700;
-    line-height: 1.24;
-    margin: 0 0 22px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid #2c2c2e;
-}}
-h2 {{
-    color: #f2f2f7;
-    font-size: 19px;
-    font-weight: 650;
-    margin: 28px 0 10px;
-}}
-p {{
-    margin: 0 0 14px;
-}}
-ul {{
-    margin: 8px 0 18px 22px;
-    padding: 0;
-}}
-li {{
-    margin: 0 0 8px;
-}}
-strong {{
-    color: #ffffff;
-}}
-</style>
-</head>
-<body>{compile_html(markdown)}</body>
-</html>
-"""
