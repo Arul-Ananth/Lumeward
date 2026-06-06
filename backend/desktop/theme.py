@@ -108,6 +108,22 @@ QTextEdit#executionLog {
     border-radius: 6px;
     color: #3a3a3c;
 }
+QLabel#panelTitle {
+    color: #007aff;
+    font-weight: 700;
+}
+QFrame#insightCard {
+    background-color: #ffffff;
+    border: 1px solid #d1d1d6;
+    border-radius: 8px;
+}
+QLabel#insightTitle {
+    color: #1c1c1e;
+    font-weight: 700;
+}
+QLabel#insightMeta, QLabel#insightBullet, QLabel#insightTopics, QLabel#feedEmpty {
+    color: #3a3a3c;
+}
 """
     return """
 QMainWindow, QDialog, QScrollArea, QWidget {
@@ -174,6 +190,22 @@ QTextEdit#executionLog {
     background-color: #18181a;
     border: 1px solid #2c2c2e;
     border-radius: 6px;
+    color: #c7c7cc;
+}
+QLabel#panelTitle {
+    color: #00f2fe;
+    font-weight: 700;
+}
+QFrame#insightCard {
+    background-color: #1c1c1e;
+    border: 1px solid #2c2c2e;
+    border-radius: 8px;
+}
+QLabel#insightTitle {
+    color: #f5f5f7;
+    font-weight: 700;
+}
+QLabel#insightMeta, QLabel#insightBullet, QLabel#insightTopics, QLabel#feedEmpty {
     color: #c7c7cc;
 }
 """

@@ -95,6 +95,26 @@ class NewsletterSchedule(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class IntelligenceFeed(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    title: str = Field(max_length=200)
+    summary_json: str
+    source_type: str = Field(max_length=80, index=True)
+    source_ref: str = Field(max_length=512, index=True)
+    topic_key: str = Field(max_length=120, index=True)
+    topics_json: str
+    interest_score: float = Field(default=0.0, index=True)
+    priority_score: float = Field(default=0.0, index=True)
+    status: str = Field(default="new", max_length=32, index=True)
+    raw_event_ids_json: str
+    deep_dive_digest_id: int | None = Field(default=None, foreign_key="newsletterdigest.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    dismissed_at: datetime | None = Field(default=None, index=True)
+    failure_reason: str | None = None
+
+
 class EventRaw(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     event_type: str = Field(index=True, max_length=80)

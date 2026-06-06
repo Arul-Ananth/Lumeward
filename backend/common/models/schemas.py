@@ -137,3 +137,15 @@ class NewsletterScheduleResponse(StrictBaseModel):
     last_run_at: str | None = None
     created_at: str
     updated_at: str
+
+
+class FeedCardResponse(StrictBaseModel):
+    id: int
+    title: str
+    bullets: list[str]
+    topics: list[str]
+    source_type: str
+    priority_score: float
+    interest_score: float
+    created_at: str
+    status: str

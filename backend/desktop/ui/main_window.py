@@ -22,6 +22,9 @@ from backend.desktop.ui.ollama_dialogs import confirm_ollama_ready
 from backend.desktop.ui.overlay import ScreenSnipperOverlay
 from backend.desktop.ui.settings_dialog import SettingsDialog
 from backend.desktop.ui.signal_bus import get_signal_bus
+from backend.desktop.workers.feed_deep_dive_worker import FeedDeepDiveWorker
+from backend.desktop.workers.feed_processor_worker import FeedProcessorWorker
+from backend.desktop.workers.feed_refresh_worker import FeedDismissWorker, FeedRefreshWorker
 
 logger = logging.getLogger(__name__)
 TIME_SENSITIVE_TERMS = ("today", "todays", "today's", "current", "latest", "recent")
@@ -54,6 +57,10 @@ class MainWindow(QMainWindow):
 
         self._ai_worker: AIWorker | None = None
         self._ocr_worker: OCRWorker | None = None
+        self._feed_refresh_worker: FeedRefreshWorker | None = None
+        self._feed_processor_worker: FeedProcessorWorker | None = None
+        self._feed_dismiss_worker: FeedDismissWorker | None = None
+        self._feed_deep_dive_worker: FeedDeepDiveWorker | None = None
         self._context_fragments: list[str] = []
         self._has_result = False
         self._generation_error_pending = False
@@ -83,6 +90,8 @@ class MainWindow(QMainWindow):
         self.ui.copy_btn.clicked.connect(self.copy_result)
         self.ui.clear_btn.clicked.connect(self.clear_result)
         self.ui.save_btn.clicked.connect(self.save_result_as_markdown)
+        self.ui.feed_panel.dismiss_requested.connect(self.dismiss_feed_card)
+        self.ui.feed_panel.deep_dive_requested.connect(self.start_feed_deep_dive)
         self.topic_input.textChanged.connect(self._update_action_states)
 
         for label, button in self.ui.preset_buttons.items():
@@ -116,6 +125,11 @@ class MainWindow(QMainWindow):
             self._ipc_timer.timeout.connect(self._poll_ipc)
             self._ipc_timer.start()
 
+        self._feed_timer = QTimer(self)
+        self._feed_timer.setInterval(60000)
+        self._feed_timer.timeout.connect(self.process_feed_events)
+        self._feed_timer.start()
+
         if bridge_warning:
             self.signal_bus.log_message.emit(bridge_warning)
             self.signal_bus.status_message.emit("Browser bridge disabled for this session.")
@@ -123,6 +137,8 @@ class MainWindow(QMainWindow):
         self._update_runtime_summary()
         self._update_result_metadata(None)
         self._update_action_states()
+        QTimer.singleShot(0, self.process_feed_events)
+        QTimer.singleShot(200, self.refresh_feed)
 
     def open_settings(self) -> None:
         dlg = SettingsDialog(self, on_saved=self._on_settings_saved, bridge_status=self._bridge_status_text())
@@ -240,6 +256,62 @@ class MainWindow(QMainWindow):
             state="Error",
             grounded=self._is_current_date_grounded(topic),
         )
+        self._update_action_states()
+
+    def process_feed_events(self) -> None:
+        if self._feed_processor_worker and self._feed_processor_worker.isRunning():
+            return
+        self._feed_processor_worker = FeedProcessorWorker(self.user_id, self)
+        self._feed_processor_worker.processed.connect(self._on_feed_processed)
+        self._feed_processor_worker.error_message.connect(self.show_status)
+        self._feed_processor_worker.start()
+
+    def refresh_feed(self) -> None:
+        if self._feed_refresh_worker and self._feed_refresh_worker.isRunning():
+            return
+        self._feed_refresh_worker = FeedRefreshWorker(self.user_id, self)
+        self._feed_refresh_worker.cards_ready.connect(self.ui.feed_panel.set_cards)
+        self._feed_refresh_worker.error_message.connect(self.show_status)
+        self._feed_refresh_worker.start()
+
+    def dismiss_feed_card(self, feed_id: int) -> None:
+        if self._feed_dismiss_worker and self._feed_dismiss_worker.isRunning():
+            return
+        self._feed_dismiss_worker = FeedDismissWorker(self.user_id, feed_id, self)
+        self._feed_dismiss_worker.completed.connect(lambda _feed_id: self.refresh_feed())
+        self._feed_dismiss_worker.error_message.connect(self.show_status)
+        self._feed_dismiss_worker.start()
+
+    def start_feed_deep_dive(self, feed_id: int) -> None:
+        if self._feed_deep_dive_worker and self._feed_deep_dive_worker.isRunning():
+            self.show_status("Deep Dive already running.")
+            return
+        self.ui.feed_panel.set_card_loading(feed_id, True)
+        self.show_status("Running Deep Dive...")
+        self._feed_deep_dive_worker = FeedDeepDiveWorker(self.user_id, feed_id, self.session_id, self)
+        self._feed_deep_dive_worker.result_ready.connect(self._on_feed_deep_dive_result)
+        self._feed_deep_dive_worker.error_message.connect(self._on_feed_deep_dive_error)
+        self._feed_deep_dive_worker.start()
+
+    def _on_feed_processed(self, created: int) -> None:
+        if created:
+            self.refresh_feed()
+
+    def _on_feed_deep_dive_result(self, feed_id: int, markdown: str) -> None:
+        self.ui.feed_panel.set_card_loading(feed_id, False)
+        self._current_markdown = markdown
+        self.output_area.setHtml(render_digest_html(markdown, self._current_theme_mode()))
+        self._has_result = True
+        self._generation_error_pending = False
+        self.show_status("Deep Dive ready.")
+        self.refresh_feed()
+        self._update_action_states()
+
+    def _on_feed_deep_dive_error(self, feed_id: int, message: str) -> None:
+        self.ui.feed_panel.set_card_loading(feed_id, False)
+        self._set_result_placeholder(message)
+        self.show_status("Deep Dive failed.")
+        self._append_activity(message)
         self._update_action_states()
 
     def on_ai_finished(self) -> None:
@@ -369,6 +441,8 @@ class MainWindow(QMainWindow):
         self.hotkey_manager.unregister()
         if self._ipc_timer is not None:
             self._ipc_timer.stop()
+        if hasattr(self, "_feed_timer"):
+            self._feed_timer.stop()
 
         if self._ocr_worker and self._ocr_worker.isRunning():
             self._ocr_worker.cancel()
@@ -376,6 +450,14 @@ class MainWindow(QMainWindow):
         if self._ai_worker and self._ai_worker.isRunning():
             self._ai_worker.cancel()
             self._ai_worker.wait(2000)
+        for worker in (
+            self._feed_refresh_worker,
+            self._feed_processor_worker,
+            self._feed_dismiss_worker,
+            self._feed_deep_dive_worker,
+        ):
+            if worker and worker.isRunning():
+                worker.wait(2000)
 
         if self._api_stop_event is not None:
             self._api_stop_event.set()

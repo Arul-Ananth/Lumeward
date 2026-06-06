@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QScrollArea,
+    QSplitter,
     QTextBrowser,
     QTextEdit,
     QToolButton,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from backend.desktop.ui.collapsible_log_widget import CollapsibleLogWidget
+from backend.desktop.widgets.intelligence_feed_panel import IntelligenceFeedPanel
 
 PRESET_GUIDANCE: dict[str, str] = {
     "Beginner": "Write for beginners.",
@@ -46,6 +48,7 @@ class MainWindowWidgets:
     result_meta_label: QLabel
     output_area: QTextBrowser
     log_widget: CollapsibleLogWidget
+    feed_panel: IntelligenceFeedPanel
     preset_buttons: dict[str, QPushButton]
 
 
@@ -85,10 +88,16 @@ def build_main_window_content() -> MainWindowWidgets:
     root_layout.setSpacing(12)
     root_layout.setContentsMargins(14, 14, 14, 14)
 
-    ask_box, ask_layout = _build_section("Brief")
+    ask_box, ask_layout = _build_section("Lumeward")
     topic_input = QLineEdit()
-    topic_input.setPlaceholderText("Topic")
-    ask_layout.addWidget(topic_input)
+    topic_input.setPlaceholderText("Search / Ask Lumeward...")
+    generate_btn = QPushButton("Generate Brief")
+    generate_btn.setObjectName("primaryButton")
+    generate_btn.setMinimumHeight(40)
+    ask_row = QHBoxLayout()
+    ask_row.addWidget(topic_input, 1)
+    ask_row.addWidget(generate_btn)
+    ask_layout.addLayout(ask_row)
     root_layout.addWidget(ask_box)
 
     guidance_toggle, guidance_content, guidance_content_layout = _build_dropdown("Guidance")
@@ -124,12 +133,7 @@ def build_main_window_content() -> MainWindowWidgets:
     capability_label.hide()
     capability_label.setWordWrap(True)
 
-    generate_btn = QPushButton("Generate Brief")
-    generate_btn.setObjectName("primaryButton")
-    generate_btn.setMinimumHeight(40)
-    root_layout.addWidget(generate_btn)
-
-    result_box, result_layout = _build_section("Result")
+    result_box, result_layout = _build_section("Deep Dive Viewer")
     result_meta_label = QLabel("No result")
     result_meta_label.hide()
     result_meta_label.setWordWrap(True)
@@ -155,7 +159,14 @@ def build_main_window_content() -> MainWindowWidgets:
 
     log_widget = CollapsibleLogWidget()
     result_layout.addWidget(log_widget)
-    root_layout.addWidget(result_box, 1)
+
+    feed_panel = IntelligenceFeedPanel()
+    main_splitter = QSplitter(Qt.Horizontal)
+    main_splitter.addWidget(feed_panel)
+    main_splitter.addWidget(result_box)
+    main_splitter.setStretchFactor(0, 1)
+    main_splitter.setStretchFactor(1, 2)
+    root_layout.addWidget(main_splitter, 1)
 
     scroll_area = QScrollArea()
     scroll_area.setWidgetResizable(True)
@@ -178,5 +189,6 @@ def build_main_window_content() -> MainWindowWidgets:
         result_meta_label=result_meta_label,
         output_area=output_area,
         log_widget=log_widget,
+        feed_panel=feed_panel,
         preset_buttons=preset_buttons,
     )

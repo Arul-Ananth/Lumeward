@@ -75,10 +75,28 @@ def _migration_003_newsletter_curation_tables(conn) -> None:
     )
 
 
+def _migration_004_intelligence_feed(conn) -> None:
+    if engine.dialect.name != "sqlite":
+        return
+    conn.exec_driver_sql(
+        """
+        CREATE INDEX IF NOT EXISTS ix_intelligencefeed_user_status_priority
+        ON intelligencefeed(user_id, status, priority_score, created_at)
+        """
+    )
+    conn.exec_driver_sql(
+        """
+        CREATE INDEX IF NOT EXISTS ix_intelligencefeed_user_source_ref
+        ON intelligencefeed(user_id, source_ref)
+        """
+    )
+
+
 MIGRATIONS: list[Migration] = [
     ("001_add_derivedmemory_user_id", _migration_001_add_derivedmemory_user_id),
     ("002_backfill_auth_identities", _migration_002_backfill_auth_identities),
     ("003_newsletter_curation_tables", _migration_003_newsletter_curation_tables),
+    ("004_intelligence_feed", _migration_004_intelligence_feed),
 ]
 
 

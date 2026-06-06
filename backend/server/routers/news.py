@@ -10,6 +10,7 @@ from backend.common.models.sql import NewsletterSchedule, NewsletterTemplate
 from backend.common.models.schemas import (
     FeedbackRequest,
     FeedbackResponse,
+    FeedCardResponse,
     MessageResponse,
     NewsRequest,
     NewsResponse,
@@ -21,6 +22,8 @@ from backend.common.models.schemas import (
     NewsletterTemplateResponse,
     ProfileResponse,
 )
+from backend.common.services.intelligence_feed.feed_deep_dive import run_deep_dive
+from backend.common.services.intelligence_feed.feed_router import IntelligenceFeedRouter
 from backend.common.services.auth.resolver import get_current_principal
 from backend.common.services.auth.types import AuthPrincipal
 from backend.common.services.memory import vector_db
@@ -39,6 +42,7 @@ from backend.server.services import billing
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["News"])
+feed_router = IntelligenceFeedRouter()
 
 
 @router.post("/generate", response_model=NewsResponse)
@@ -107,6 +111,43 @@ def get_sources():
         )
         for source in list_source_capabilities()
     ]
+
+
+@router.get("/feed", response_model=list[FeedCardResponse])
+def get_feed(
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: Session = Depends(get_session),
+):
+    feed_router.process_new_events(session, principal.user_id)
+    return [_feed_card_response(card) for card in feed_router.list_cards(session, principal.user_id)]
+
+
+@router.post("/feed/{feed_id}/dismiss", response_model=FeedCardResponse)
+def dismiss_feed_card(
+    feed_id: int,
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: Session = Depends(get_session),
+):
+    card = feed_router.dismiss(session, principal.user_id, feed_id)
+    if card is None:
+        raise HTTPException(status_code=404, detail="Feed card not found")
+    return _feed_card_response(card)
+
+
+@router.post("/feed/{feed_id}/deep-dive", response_model=NewsResponse)
+async def deep_dive_feed_card(
+    feed_id: int,
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: Session = Depends(get_session),
+):
+    try:
+        content = await run_deep_dive(session, user_id=principal.user_id, feed_id=feed_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Feed deep dive failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Feed deep dive failed.") from exc
+    return NewsResponse(topic=f"Feed card {feed_id}", content=content, bill={"deducted": 1, "remaining": "local"})
 
 
 @router.get("/history", response_model=list[NewsletterDigestResponse])
@@ -274,6 +315,20 @@ def _schedule_response(schedule: NewsletterSchedule) -> NewsletterScheduleRespon
         last_run_at=schedule.last_run_at.isoformat() if schedule.last_run_at else None,
         created_at=schedule.created_at.isoformat(),
         updated_at=schedule.updated_at.isoformat(),
+    )
+
+
+def _feed_card_response(card) -> FeedCardResponse:
+    return FeedCardResponse(
+        id=card.id,
+        title=card.title,
+        bullets=card.bullets,
+        topics=card.topics,
+        source_type=card.source_type,
+        priority_score=card.priority_score,
+        interest_score=card.interest_score,
+        created_at=card.created_at.isoformat(),
+        status=card.status,
     )
 
 
