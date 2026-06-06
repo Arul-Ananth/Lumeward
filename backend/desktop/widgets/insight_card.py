@@ -22,10 +22,21 @@ class InsightCard(QFrame):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(7)
 
+        header = QHBoxLayout()
         title = QLabel(card.title)
         title.setObjectName("insightTitle")
         title.setWordWrap(True)
-        layout.addWidget(title)
+        header.addWidget(title, 1)
+
+        self.dismiss_button = QPushButton("Dismiss")
+        self.deep_dive_button = QPushButton("Deep Dive")
+        self.dismiss_button.setMinimumHeight(32)
+        self.deep_dive_button.setMinimumHeight(32)
+        self.dismiss_button.clicked.connect(self._request_dismiss)
+        self.deep_dive_button.clicked.connect(self._request_deep_dive)
+        header.addWidget(self.dismiss_button)
+        header.addWidget(self.deep_dive_button)
+        layout.addLayout(header)
 
         meta = QLabel(f"{_relative_time(card.created_at)} | {card.source_type}")
         meta.setObjectName("insightMeta")
@@ -43,20 +54,16 @@ class InsightCard(QFrame):
             topics.setWordWrap(True)
             layout.addWidget(topics)
 
-        actions = QHBoxLayout()
-        self.dismiss_button = QPushButton("Dismiss")
-        self.deep_dive_button = QPushButton("Dive")
-        self.dismiss_button.clicked.connect(lambda: self.dismiss_requested.emit(card.id))
-        self.deep_dive_button.clicked.connect(lambda: self.deep_dive_requested.emit(card.id))
-        actions.addWidget(self.dismiss_button)
-        actions.addWidget(self.deep_dive_button)
-        actions.addStretch(1)
-        layout.addLayout(actions)
-
     def set_loading(self, loading: bool) -> None:
         self.deep_dive_button.setEnabled(not loading)
         self.dismiss_button.setEnabled(not loading)
-        self.deep_dive_button.setText("Loading" if loading else "Dive")
+        self.deep_dive_button.setText("Loading" if loading else "Deep Dive")
+
+    def _request_dismiss(self) -> None:
+        self.dismiss_requested.emit(self.card.id)
+
+    def _request_deep_dive(self) -> None:
+        self.deep_dive_requested.emit(self.card.id)
 
 
 def _relative_time(value: datetime) -> str:

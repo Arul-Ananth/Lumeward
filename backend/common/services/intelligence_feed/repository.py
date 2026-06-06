@@ -9,12 +9,17 @@ from backend.common.models.sql import IntelligenceFeed
 from backend.common.services.intelligence_feed.schemas import FeedCard
 
 ACTIVE_STATUSES = ("new", "seen", "deep_dive_ready")
+VISIBLE_SOURCE_TYPES = ("clipboard", "file_drop", "folder_watch", "ui")
 
 
 def list_cards(session: Session, user_id: int, *, limit: int = 25) -> list[FeedCard]:
     statement = (
         select(IntelligenceFeed)
-        .where(IntelligenceFeed.user_id == user_id, IntelligenceFeed.status.in_(ACTIVE_STATUSES))
+        .where(
+            IntelligenceFeed.user_id == user_id,
+            IntelligenceFeed.status.in_(ACTIVE_STATUSES),
+            IntelligenceFeed.source_type.in_(VISIBLE_SOURCE_TYPES),
+        )
         .order_by(IntelligenceFeed.priority_score.desc(), IntelligenceFeed.created_at.desc())
         .limit(limit)
     )

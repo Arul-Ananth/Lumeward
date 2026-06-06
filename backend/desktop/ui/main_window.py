@@ -286,9 +286,17 @@ class MainWindow(QMainWindow):
         if self._feed_deep_dive_worker and self._feed_deep_dive_worker.isRunning():
             self.show_status("Deep Dive already running.")
             return
+        if not self._confirm_ollama_ready():
+            return
         self.ui.feed_panel.set_card_loading(feed_id, True)
         self.show_status("Running Deep Dive...")
-        self._feed_deep_dive_worker = FeedDeepDiveWorker(self.user_id, feed_id, self.session_id, self)
+        self._feed_deep_dive_worker = FeedDeepDiveWorker(
+            self.user_id,
+            feed_id,
+            self.session_id,
+            self._current_api_keys(),
+            self,
+        )
         self._feed_deep_dive_worker.result_ready.connect(self._on_feed_deep_dive_result)
         self._feed_deep_dive_worker.error_message.connect(self._on_feed_deep_dive_error)
         self._feed_deep_dive_worker.start()

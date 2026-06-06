@@ -18,11 +18,19 @@ class FeedDeepDiveWorker(QThread):
     result_ready = Signal(int, str)
     error_message = Signal(int, str)
 
-    def __init__(self, user_id: int, feed_id: int, session_id: str, parent=None) -> None:
+    def __init__(
+        self,
+        user_id: int,
+        feed_id: int,
+        session_id: str,
+        api_keys: dict[str, str | None] | None = None,
+        parent=None,
+    ) -> None:
         super().__init__(parent)
         self.user_id = user_id
         self.feed_id = feed_id
         self.session_id = session_id
+        self.api_keys = api_keys or {}
 
     def run(self) -> None:
         try:
@@ -33,6 +41,7 @@ class FeedDeepDiveWorker(QThread):
                         user_id=self.user_id,
                         feed_id=self.feed_id,
                         session_id=self.session_id,
+                        api_keys=self.api_keys,
                     )
                 )
             self.result_ready.emit(self.feed_id, markdown)

@@ -12,7 +12,14 @@ from backend.common.services.newsletter.pipeline import newsletter_pipeline
 _sanitizer = InputSanitizer()
 
 
-async def run_deep_dive(session: Session, *, user_id: int, feed_id: int, session_id: str | None = None) -> str:
+async def run_deep_dive(
+    session: Session,
+    *,
+    user_id: int,
+    feed_id: int,
+    session_id: str | None = None,
+    api_keys: dict | None = None,
+) -> str:
     row = repository.get_feed_row(session, user_id, feed_id)
     if row is None:
         raise ValueError("Feed card not found.")
@@ -23,6 +30,7 @@ async def run_deep_dive(session: Session, *, user_id: int, feed_id: int, session
         user_id=user_id,
         session=session,
         context=context,
+        api_keys=api_keys or {},
         session_id=session_id,
     )
     digest_id = _latest_digest_id(session, user_id)

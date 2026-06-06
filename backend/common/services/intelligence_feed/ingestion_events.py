@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from sqlmodel import Session, select
 
@@ -9,11 +10,14 @@ from backend.common.security.policy import InputSanitizer
 from backend.common.services.intelligence_feed.schemas import NormalizedEvent
 
 _sanitizer = InputSanitizer()
+FEED_EVENT_TYPES = {"clipboard", "file_ingestion", "generate_newsletter"}
 
 
 def load_unprocessed_events(session: Session, user_id: int, *, limit: int = 20) -> list[NormalizedEvent]:
     processed_ids = _processed_event_ids(session, user_id)
-    events = session.exec(select(EventRaw).order_by(EventRaw.ts.desc()).limit(limit * 3)).all()
+    events = session.exec(
+        select(EventRaw).where(EventRaw.event_type.in_(FEED_EVENT_TYPES)).order_by(EventRaw.ts.desc()).limit(limit * 5)
+    ).all()
     normalized: list[NormalizedEvent] = []
     for event in events:
         if event.id is None or event.id in processed_ids:
@@ -27,6 +31,8 @@ def load_unprocessed_events(session: Session, user_id: int, *, limit: int = 20) 
 
 
 def normalize_event(event: EventRaw, user_id: int) -> NormalizedEvent | None:
+    if event.event_type not in FEED_EVENT_TYPES:
+        return None
     payload = _loads(event.payload_json)
     text = _event_text(event, payload)
     if len(text.strip()) < 20:
@@ -60,11 +66,13 @@ def _processed_event_ids(session: Session, user_id: int) -> set[int]:
 
 
 def _event_text(event: EventRaw, payload: dict) -> str:
+    if event.event_type == "file_ingestion" and payload.get("path"):
+        return f"File added: {Path(str(payload['path'])).name}"
     for key in ("text", "topic", "url", "path", "title"):
         value = payload.get(key)
         if value:
             return str(value)
-    return f"{event.event_type} from {event.source}"
+    return ""
 
 
 def _source_ref(event: EventRaw, payload: dict) -> str:

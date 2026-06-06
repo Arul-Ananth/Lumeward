@@ -57,8 +57,8 @@ class IntelligenceFeedPanel(QWidget):
 
         for card in cards:
             widget = InsightCard(card)
-            widget.dismiss_requested.connect(self.dismiss_requested)
-            widget.deep_dive_requested.connect(self.deep_dive_requested)
+            widget.dismiss_requested.connect(self.dismiss_requested.emit)
+            widget.deep_dive_requested.connect(self.deep_dive_requested.emit)
             self._cards[card.id] = widget
             self.content_layout.addWidget(widget)
         self.content_layout.addStretch(1)
