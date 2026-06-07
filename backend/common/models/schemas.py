@@ -149,3 +149,13 @@ class FeedCardResponse(StrictBaseModel):
     interest_score: float
     created_at: str
     status: str
+
+
+class FolderIngestResponse(StrictBaseModel):
+    status: str
+    batch_id: str
+    files_seen: int
+    files_ingested: int
+    files_skipped: int
+    files_failed: int
+    message: str

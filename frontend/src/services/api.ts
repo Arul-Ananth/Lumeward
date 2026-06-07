@@ -25,6 +25,16 @@ export interface MemoryRecord {
     metadata: MemoryMetadata;
 }
 
+export interface FolderIngestResponse {
+    status: string;
+    batch_id: string;
+    files_seen: number;
+    files_ingested: number;
+    files_skipped: number;
+    files_failed: number;
+    message: string;
+}
+
 interface RawMemoryRecord {
     id: string | number;
     document: string;
@@ -78,5 +88,14 @@ export const api = {
         const data = await apiRequest<ProfileResponse>('/news/profile');
         const items = Array.isArray(data.memories) ? data.memories : [];
         return items.map(normalizeMemory);
+    },
+
+    uploadFolderZip: async (file: File): Promise<FolderIngestResponse> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        return apiRequest<FolderIngestResponse>('/news/ingest/folder', {
+            method: 'POST',
+            body: formData,
+        });
     },
 };

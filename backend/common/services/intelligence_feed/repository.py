@@ -9,7 +9,7 @@ from backend.common.models.sql import IntelligenceFeed
 from backend.common.services.intelligence_feed.schemas import FeedCard
 
 ACTIVE_STATUSES = ("new", "seen", "deep_dive_ready")
-VISIBLE_SOURCE_TYPES = ("clipboard", "file_drop", "folder_watch", "ui")
+VISIBLE_SOURCE_TYPES = ("clipboard", "file_drop", "folder_watch", "folder_upload", "ui")
 
 
 def list_cards(session: Session, user_id: int, *, limit: int = 25) -> list[FeedCard]:

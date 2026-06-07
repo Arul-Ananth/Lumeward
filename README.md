@@ -49,6 +49,30 @@ Lumeward is a hybrid AI brief/newsletter application with shared backend service
 - Built-in templates include Daily Tech Briefing, Weekly Research Digest, Morning Digest, and Current Events Summary.
 - Server `/news` APIs support generation, digest history/archive, templates, and schedules.
 
+### Server folder upload
+
+Server mode supports explicit folder ingestion through `.zip` uploads. Uploaded archives and extracted files are staged under the managed data directory and are deleted only on the next server startup when cleanup is enabled.
+
+Configure cleanup and limits in `.env`:
+
+```env
+FOLDER_UPLOAD_ENABLED=true
+FOLDER_UPLOAD_DIR=uploads/folders
+FOLDER_UPLOAD_DELETE_ON_RESTART=true
+FOLDER_UPLOAD_MAX_ARCHIVE_MB=10240
+FOLDER_UPLOAD_MAX_FILES=500
+```
+
+Upload a zipped folder:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri http://127.0.0.1:8000/news/ingest/folder `
+  -Form @{ file = Get-Item .\my-folder.zip }
+```
+
+Only `.txt`, `.md`, `.html`, `.pdf`, and `.docx` files are indexed. Indexed memory remains in SQLite/Qdrant after staged upload files are cleaned up.
+
 ### Desktop telemetry and clipboard
 
 - Desktop telemetry is opt-in.

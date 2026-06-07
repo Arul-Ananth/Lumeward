@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlmodel import Session
 
 from backend.common.config import settings
@@ -11,6 +11,7 @@ from backend.common.models.schemas import (
     FeedbackRequest,
     FeedbackResponse,
     FeedCardResponse,
+    FolderIngestResponse,
     MessageResponse,
     NewsRequest,
     NewsResponse,
@@ -24,6 +25,7 @@ from backend.common.models.schemas import (
 )
 from backend.common.services.intelligence_feed.feed_deep_dive import run_deep_dive
 from backend.common.services.intelligence_feed.feed_router import IntelligenceFeedRouter
+from backend.common.services.ingestion import ingest_folder_zip
 from backend.common.services.auth.resolver import get_current_principal
 from backend.common.services.auth.types import AuthPrincipal
 from backend.common.services.memory import vector_db
@@ -148,6 +150,37 @@ async def deep_dive_feed_card(
         logger.exception("Feed deep dive failed: %s", exc)
         raise HTTPException(status_code=500, detail="Feed deep dive failed.") from exc
     return NewsResponse(topic=f"Feed card {feed_id}", content=content, bill={"deducted": 1, "remaining": "local"})
+
+
+@router.post("/ingest/folder", response_model=FolderIngestResponse)
+async def ingest_folder_upload(
+    file: UploadFile,
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: Session = Depends(get_session),
+):
+    try:
+        archive_bytes = await file.read()
+        result = ingest_folder_zip(
+            session,
+            archive_bytes=archive_bytes,
+            filename=file.filename or "folder.zip",
+            user_id=principal.user_id,
+            session_id="server-upload",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Folder upload ingestion failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Folder upload ingestion failed.") from exc
+    return FolderIngestResponse(
+        status=result.status,
+        batch_id=result.batch_id,
+        files_seen=result.files_seen,
+        files_ingested=result.files_ingested,
+        files_skipped=result.files_skipped,
+        files_failed=result.files_failed,
+        message=result.message,
+    )
 
 
 @router.get("/history", response_model=list[NewsletterDigestResponse])

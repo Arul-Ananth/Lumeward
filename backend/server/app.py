@@ -10,11 +10,13 @@ from backend.common.config import settings
 from backend.common.database import create_db_and_tables, engine
 from backend.common.version import APP_VERSION
 from backend.common.services.auth.store import ensure_trusted_lan_user
+from backend.common.services.ingestion import cleanup_managed_uploads_on_startup
 from backend.server.routers import auth, news
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    cleanup_managed_uploads_on_startup()
     create_db_and_tables()
     if settings.is_trusted_lan_auth():
         with Session(engine) as session:

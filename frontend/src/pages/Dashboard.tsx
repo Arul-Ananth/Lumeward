@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import {
     Typography, Container, Paper, TextField, Button,
@@ -10,6 +10,7 @@ import {
     ThumbUp as ThumbUpIcon,
     ThumbDown as ThumbDownIcon,
     Refresh as RefreshIcon,
+    UploadFile as UploadFileIcon,
 } from '@mui/icons-material';
 
 import { api } from '../services/api';
@@ -29,6 +30,10 @@ const Dashboard = () => {
     const [snackbarMsg, setSnackbarMsg] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
     const [credits, setCredits] = useState<number | string | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [uploadStatus, setUploadStatus] = useState('');
+    const [uploadError, setUploadError] = useState('');
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const handleGenerate = async () => {
         if (!topic) return;
@@ -80,6 +85,35 @@ const Dashboard = () => {
         }
     };
 
+    const handleUploadClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFolderZipUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+        setUploadStatus('');
+        setUploadError('');
+        if (!file.name.toLowerCase().endsWith('.zip')) {
+            setUploadError('Select a .zip archive.');
+            return;
+        }
+
+        setUploading(true);
+        try {
+            const response = await api.uploadFolderZip(file);
+            setUploadStatus(
+                `${response.files_ingested} indexed, ${response.files_skipped} skipped, ${response.files_failed} failed.`,
+            );
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Folder upload failed.';
+            setUploadError(message);
+        } finally {
+            setUploading(false);
+        }
+    };
+
     useEffect(() => {
         if (tabIndex === 1) fetchProfile();
     }, [tabIndex]);
@@ -126,6 +160,39 @@ const Dashboard = () => {
                                     <Box sx={{ mt: 2 }}>
                                         <Alert severity="error">{errorMsg}</Alert>
                                     </Box>
+                                )}
+                            </Paper>
+
+                            <Paper sx={{ p: 3, borderRadius: 2, mt: 3 }}>
+                                <Typography variant="h6" gutterBottom>Upload Folder</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    Upload a zipped folder to index supported documents for server memory.
+                                </Typography>
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept=".zip,application/zip"
+                                    hidden
+                                    onChange={handleFolderZipUpload}
+                                />
+                                <Button
+                                    fullWidth
+                                    variant="outlined"
+                                    onClick={handleUploadClick}
+                                    disabled={uploading}
+                                    startIcon={uploading ? <CircularProgress size={20} /> : <UploadFileIcon />}
+                                >
+                                    {uploading ? 'Indexing...' : 'Upload .zip'}
+                                </Button>
+                                {uploadStatus && (
+                                    <Alert severity="success" sx={{ mt: 2 }}>
+                                        {uploadStatus}
+                                    </Alert>
+                                )}
+                                {uploadError && (
+                                    <Alert severity="error" sx={{ mt: 2 }}>
+                                        {uploadError}
+                                    </Alert>
                                 )}
                             </Paper>
                         </Grid>

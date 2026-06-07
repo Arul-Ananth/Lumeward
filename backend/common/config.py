@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     DOC_MAX_MB: int = 10
     CHUNK_SIZE: int = 800
     CHUNK_OVERLAP: int = 200
+    FOLDER_UPLOAD_ENABLED: bool = True
+    FOLDER_UPLOAD_DIR: str = "uploads/folders"
+    FOLDER_UPLOAD_DELETE_ON_RESTART: bool = True
+    FOLDER_UPLOAD_MAX_ARCHIVE_MB: int = 10240
+    FOLDER_UPLOAD_MAX_FILES: int = 500
     QDRANT_COLLECTION_USER_DOCS: str = "user_documents"
     QDRANT_COLLECTION_SESSION_MEMORY: str = "session_memory"
     QDRANT_COLLECTION_USER_PROFILE: str = "user_profile"

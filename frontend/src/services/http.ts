@@ -29,7 +29,9 @@ export async function apiRequest<T>(
     const requestHeaders = new Headers(headers || {});
     const token = includeAuth ? getSessionToken() : null;
 
-    if (body !== undefined && !requestHeaders.has('Content-Type')) {
+    const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
+
+    if (body !== undefined && !isFormData && !requestHeaders.has('Content-Type')) {
         requestHeaders.set('Content-Type', 'application/json');
     }
     if (token && !requestHeaders.has('Authorization')) {
@@ -41,7 +43,7 @@ export async function apiRequest<T>(
         response = await fetch(`${API_BASE_URL}${path}`, {
             method,
             headers: requestHeaders,
-            body: body !== undefined ? JSON.stringify(body) : undefined,
+            body: isFormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
         });
     } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown network error';

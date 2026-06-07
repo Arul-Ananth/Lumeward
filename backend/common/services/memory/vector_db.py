@@ -5,7 +5,6 @@ import re
 import threading
 import uuid
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 from qdrant_client import QdrantClient
@@ -18,7 +17,6 @@ from backend.common.models.sql import EventRaw
 
 logger = logging.getLogger(__name__)
 
-_ROOT_DIR = Path(__file__).resolve().parents[4]
 _embedder: Any | None = None
 _embedder_lock = threading.Lock()
 _client: QdrantClient | None = None
@@ -56,7 +54,7 @@ def _create_client() -> QdrantClient:
     qdrant_url = os.getenv("QDRANT_URL")
     if qdrant_url:
         return QdrantClient(url=qdrant_url)
-    return QdrantClient(path=str(_ROOT_DIR / "qdrant_db_local"))
+    return QdrantClient(path=str(settings.DATA_DIR / "qdrant_db"))
 
 
 def get_client() -> QdrantClient:

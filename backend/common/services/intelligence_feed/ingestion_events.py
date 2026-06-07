@@ -67,7 +67,7 @@ def _processed_event_ids(session: Session, user_id: int) -> set[int]:
 
 def _event_text(event: EventRaw, payload: dict) -> str:
     if event.event_type == "file_ingestion" and payload.get("path"):
-        return f"File added: {Path(str(payload['path'])).name}"
+        return f"File added for local indexing: {Path(str(payload['path'])).stem}"
     for key in ("text", "topic", "url", "path", "title"):
         value = payload.get(key)
         if value:

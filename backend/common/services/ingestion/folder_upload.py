@@ -1,0 +1,255 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import shutil
+import uuid
+import zipfile
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path, PurePosixPath
+
+from qdrant_client.http import models
+from sqlmodel import Session
+
+from backend.common.config import settings
+from backend.common.models.sql import EventRaw, FilesIndex
+from backend.common.services.memory.vector_db import client, ensure_collection, get_embedder
+from backend.common.services.telemetry.ingestion import chunk_text, extract_text_from_file, file_sha256
+
+ALLOWED_EXTENSIONS = {".txt", ".md", ".html", ".pdf", ".docx"}
+
+
+@dataclass(frozen=True)
+class FolderIngestResult:
+    status: str
+    batch_id: str
+    files_seen: int
+    files_ingested: int
+    files_skipped: int
+    files_failed: int
+    message: str
+
+
+def cleanup_managed_uploads_on_startup() -> int:
+    if not settings.FOLDER_UPLOAD_DELETE_ON_RESTART:
+        return 0
+    root = upload_root()
+    if not root.exists():
+        return 0
+    removed = 0
+    for child in root.iterdir():
+        _assert_inside(child, root)
+        if child.is_dir():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+        removed += 1
+    return removed
+
+
+def upload_root() -> Path:
+    relative = Path(settings.FOLDER_UPLOAD_DIR)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("FOLDER_UPLOAD_DIR must be a relative path inside DATA_DIR.")
+    root = settings.DATA_DIR / relative
+    root.mkdir(parents=True, exist_ok=True)
+    _assert_inside(root, settings.DATA_DIR)
+    return root
+
+
+def ingest_folder_zip(
+    session: Session,
+    *,
+    archive_bytes: bytes,
+    filename: str,
+    user_id: int,
+    session_id: str = "server-upload",
+) -> FolderIngestResult:
+    if not settings.FOLDER_UPLOAD_ENABLED:
+        raise ValueError("Folder upload ingestion is disabled.")
+    if not filename.lower().endswith(".zip"):
+        raise ValueError("Folder upload requires a .zip archive.")
+
+    max_archive_bytes = settings.FOLDER_UPLOAD_MAX_ARCHIVE_MB * 1024 * 1024
+    if len(archive_bytes) > max_archive_bytes:
+        raise ValueError(f"Archive exceeds {settings.FOLDER_UPLOAD_MAX_ARCHIVE_MB} MB.")
+
+    batch_id = uuid.uuid4().hex
+    batch_dir = upload_root() / batch_id
+    extract_dir = batch_dir / "extracted"
+    batch_dir.mkdir(parents=True, exist_ok=False)
+    extract_dir.mkdir(parents=True, exist_ok=True)
+    _assert_inside(batch_dir, upload_root())
+
+    archive_path = batch_dir / _safe_archive_name(filename)
+    archive_path.write_bytes(archive_bytes)
+
+    with zipfile.ZipFile(archive_path) as archive:
+        members = [member for member in archive.infolist() if not member.is_dir()]
+        if len(members) > settings.FOLDER_UPLOAD_MAX_FILES:
+            raise ValueError(f"Archive contains more than {settings.FOLDER_UPLOAD_MAX_FILES} files.")
+        extracted_paths = _extract_members(archive, members, extract_dir)
+
+    seen = len(extracted_paths)
+    ingested = 0
+    skipped = 0
+    failed = 0
+    for path in extracted_paths:
+        outcome = _ingest_file(session, path=path, user_id=user_id, session_id=session_id, batch_id=batch_id)
+        if outcome == "ingested":
+            ingested += 1
+        elif outcome == "failed":
+            failed += 1
+        else:
+            skipped += 1
+
+    status = "ok" if failed == 0 else "partial"
+    return FolderIngestResult(
+        status=status,
+        batch_id=batch_id,
+        files_seen=seen,
+        files_ingested=ingested,
+        files_skipped=skipped,
+        files_failed=failed,
+        message=f"Folder archive processed. {ingested} files ingested.",
+    )
+
+
+def _extract_members(archive: zipfile.ZipFile, members: list[zipfile.ZipInfo], extract_dir: Path) -> list[Path]:
+    extracted: list[Path] = []
+    for member in members:
+        relative = _safe_member_path(member)
+        if relative is None:
+            continue
+        target = extract_dir / Path(*relative.parts)
+        _assert_inside(target, extract_dir)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with archive.open(member) as source, target.open("wb") as destination:
+            shutil.copyfileobj(source, destination)
+        extracted.append(target)
+    return extracted
+
+
+def _safe_member_path(member: zipfile.ZipInfo) -> PurePosixPath | None:
+    path = PurePosixPath(member.filename)
+    if path.is_absolute() or ".." in path.parts:
+        raise ValueError(f"Unsafe archive path: {member.filename}")
+    if _is_zip_symlink(member):
+        raise ValueError(f"Archive symlinks are not allowed: {member.filename}")
+    if path.suffix.lower() not in ALLOWED_EXTENSIONS:
+        return None
+    if any(part.startswith(".") for part in path.parts):
+        return None
+    return path
+
+
+def _is_zip_symlink(member: zipfile.ZipInfo) -> bool:
+    mode = member.external_attr >> 16
+    return (mode & 0o170000) == 0o120000
+
+
+def _ingest_file(session: Session, *, path: Path, user_id: int, session_id: str, batch_id: str) -> str:
+    max_bytes = settings.DOC_MAX_MB * 1024 * 1024
+    try:
+        if path.stat().st_size > max_bytes:
+            _upsert_file_index(session, path, "skipped", "File exceeds size limit")
+            return "skipped"
+
+        content_hash = file_sha256(path)
+        mtime = path.stat().st_mtime
+        existing = session.get(FilesIndex, str(path))
+        if existing and existing.content_hash == content_hash and existing.status == "ingested":
+            return "skipped"
+
+        text, error = extract_text_from_file(path)
+        if error:
+            _upsert_file_index(session, path, "error", error, content_hash, mtime)
+            return "failed"
+        chunks = chunk_text(text or "", settings.CHUNK_SIZE, settings.CHUNK_OVERLAP)
+        if not chunks:
+            _upsert_file_index(session, path, "skipped", "No text extracted", content_hash, mtime)
+            return "skipped"
+
+        ensure_collection(settings.QDRANT_COLLECTION_USER_DOCS)
+        vectors = get_embedder().encode(chunks).tolist()
+        points = [
+            models.PointStruct(
+                id=str(uuid.uuid4()),
+                vector=vectors[index],
+                payload={
+                    "document": chunk,
+                    "user_id": str(user_id),
+                    "path": str(path),
+                    "chunk_index": index,
+                    "upload_batch_id": batch_id,
+                    "timestamp": datetime.utcnow().isoformat(),
+                },
+            )
+            for index, chunk in enumerate(chunks)
+        ]
+        client.upsert(collection_name=settings.QDRANT_COLLECTION_USER_DOCS, points=points)
+        _upsert_file_index(session, path, "ingested", None, content_hash, mtime)
+        _persist_file_event(session, path=path, user_id=user_id, session_id=session_id, content_hash=content_hash)
+        return "ingested"
+    except Exception as exc:
+        _upsert_file_index(session, path, "error", str(exc))
+        return "failed"
+
+
+def _upsert_file_index(
+    session: Session,
+    path: Path,
+    status: str,
+    error: str | None,
+    content_hash: str | None = None,
+    mtime: float | None = None,
+) -> None:
+    record = session.get(FilesIndex, str(path))
+    if record is None:
+        record = FilesIndex(path=str(path), content_hash=content_hash or "", mtime=mtime or 0.0)
+    record.status = status
+    record.error = error
+    if content_hash is not None:
+        record.content_hash = content_hash
+    if mtime is not None:
+        record.mtime = mtime
+    record.last_ingested_at = datetime.utcnow()
+    session.add(record)
+    session.commit()
+
+
+def _persist_file_event(session: Session, *, path: Path, user_id: int, session_id: str, content_hash: str) -> None:
+    payload = {
+        "path": str(path),
+        "user_id": user_id,
+        "content_hash": content_hash,
+        "ts": datetime.utcnow().isoformat(),
+        "consent": "folder_zip_upload",
+    }
+    event = EventRaw(
+        event_type="file_ingestion",
+        session_id=session_id,
+        payload_json=json.dumps(payload, ensure_ascii=True),
+        hash=_event_hash(payload),
+        source="folder_upload",
+    )
+    session.add(event)
+    session.commit()
+
+
+def _event_hash(payload: dict) -> str:
+    raw = json.dumps(payload, sort_keys=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _safe_archive_name(filename: str) -> str:
+    name = Path(filename).name
+    return name if name.lower().endswith(".zip") else "folder.zip"
+
+
+def _assert_inside(path: Path, root: Path) -> None:
+    resolved = path.resolve()
+    resolved_root = root.resolve()
+    if resolved != resolved_root and resolved_root not in resolved.parents:
+        raise ValueError(f"Path escapes managed upload directory: {path}")
