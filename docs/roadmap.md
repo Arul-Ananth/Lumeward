@@ -39,11 +39,22 @@ Future items listed here may or may not be implemented.
 - clipboard opt-in and raw-text sensitivity split
 - runtime synchronization between saved desktop preferences and clipboard collector behavior
 - OCR, screen snipping, bridge ingestion, and file-drop context attachment
+- server `.zip` folder upload endpoint for explicit local document indexing
+- restart-based managed upload cleanup controlled through `.env`
+- upload-staged files are separate from persisted SQLite/Qdrant memory
+
+### Personal intelligence feed
+
+- local `intelligence_feed` persistence for lightweight feed cards
+- rule-based feed scoring and dedupe before heavy generation
+- Personal Feed panel in desktop mode
+- server `/news/feed` endpoints for current-user feed listing, dismiss, and Deep Dive handoff
+- Deep Dive reuses the existing newsletter pipeline instead of duplicating CrewAI generation
 
 ### Desktop UI
 
-- desktop app reframed as a brief assistant
-- main view restructured into `Ask`, `Guide`, `Run`, `Result`
+- desktop app reframed as a personal intelligence feed and deep-dive workstation
+- main view restructured around Personal Feed, collapsible Guidance, and Deep Dive Viewer
 - grouped settings dialog sections
 - theme preference in settings:
   - `System Default`
@@ -56,7 +67,7 @@ Future items listed here may or may not be implemented.
   - regenerate
   - clear
   - save as markdown
-- result metadata strip with generation timestamp, search mode, and current-date grounding flag
+- visible run/result debug metadata removed from the main workspace
 
 ### Desktop bridge stability
 

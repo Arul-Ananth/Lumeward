@@ -23,6 +23,7 @@
   - `newsletter/` active newsletter curation pipeline, templates, compiler, history persistence
   - `llm/` provider factory, tool policy, CrewAI builders, and compatibility wrappers
   - `memory/` vector and clipboard-history retrieval helpers
+  - `ingestion/` server folder upload staging, safe zip extraction, file indexing, and restart cleanup
   - `search/` Serper and desktop fallback search
   - `telemetry/` consent, ingestion, workers, session/profile rollups
 
@@ -32,17 +33,18 @@
 - Web auth supports `trusted_lan` and `interactive` modes.
 - Remote OpenAI-compatible engine support is optional and stays behind the backend.
 - Remote engine mode sends only sanitized model-generation payloads to `ENGINE_BASE_URL`; auth, memory, telemetry, schedules, digest history, and vector storage stay on the Lumeward host.
+- Server mode supports explicit `.zip` folder upload at `POST /news/ingest/folder`.
+- Uploaded archives and extracted files are staged under `DATA_DIR / FOLDER_UPLOAD_DIR`.
+- Staged upload files are deleted only on server startup when `FOLDER_UPLOAD_DELETE_ON_RESTART=true`.
+- The upload archive size limit is environment-configurable with `FOLDER_UPLOAD_MAX_ARCHIVE_MB`; the current default is `10240` MB.
+- Indexed SQLite/Qdrant memory remains after staged upload files are cleaned up.
 
 ### Desktop mode
 
 - Desktop entrypoint lives in `backend/desktop/main.py`.
 - Desktop startup now applies saved theme preference before showing the main window.
-- The main desktop UI is organized into:
-  - `Ask`
-  - `Guide`
-  - `Run`
-  - `Result`
-- The desktop UI is scrollable at the page level and still keeps output telemetry on the result pane.
+- The main desktop UI is organized around a `Personal Feed`, a collapsible `Guidance` control, and a `Deep Dive Viewer`.
+- The desktop UI is scrollable at the page level and keeps execution logs collapsed by default.
 - Desktop settings now group:
   - appearance
   - API keys
@@ -65,7 +67,7 @@
 - `backend/common/services/llm/newsletter_service.py` is a compatibility wrapper only.
 - SQLModel persistence covers templates, generated digests, and schedules.
 - `/news/generate` remains compatible with the frontend and persists generated digests.
-- `/news/history`, `/news/templates`, and `/news/schedules` expose the new history/template/schedule surface.
+- `/news/history`, `/news/templates`, `/news/schedules`, `/news/feed`, and `/news/ingest/folder` expose the current server surface.
 - `/news/sources` exposes metadata-only placeholders for future source integrations in Beta 1.0; no plugin execution or ingestion is active.
 
 ### Desktop bridge
@@ -80,6 +82,7 @@
 - Keep newsletter orchestration under `services/newsletter/`.
 - Keep provider-specific logic isolated under `services/llm/`.
 - Keep storage/memory code isolated under `services/memory/`.
+- Keep reusable upload and file-ingestion code isolated under `services/ingestion/`.
 - Keep external network tools isolated under `services/search/`.
 - Use compatibility wrappers in `services/*.py` only for transition/import stability.
 

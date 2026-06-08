@@ -90,12 +90,11 @@ Only `.txt`, `.md`, `.html`, `.pdf`, and `.docx` files are indexed. Indexed memo
 
 ### Desktop UI
 
-- The desktop UI is now framed as a brief assistant rather than only a newsletter form.
-- The main desktop screen is organized into:
-  - `Ask`
-  - `Guide`
-  - `Run`
-  - `Result`
+- The desktop UI is now framed as a personal intelligence feed and deep-dive workstation.
+- The main desktop screen is organized around:
+  - `Personal Feed`
+  - collapsible `Guidance`
+  - `Deep Dive Viewer`
 - Desktop settings include theme preference:
   - `System Default`
   - `Dark`

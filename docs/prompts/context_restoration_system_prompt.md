@@ -19,11 +19,12 @@ Lumeward is a hybrid AI brief assistant with two runtime modes built on a shared
   - React + Vite frontend.
   - Supports `trusted_lan` and `interactive` auth profiles.
   - Can route model calls through a remote OpenAI-compatible engine while keeping app state and policy local.
+  - Supports explicit `.zip` folder upload through `/news/ingest/folder` for local document indexing.
 - `DESKTOP` mode:
   - PySide6 desktop app.
   - Local bridge process for browser-to-desktop ingestion.
   - OCR, screen snipping, file ingestion, clipboard telemetry, and brief generation.
-  - Desktop UI is organized into `Ask`, `Guide`, `Run`, and `Result` sections.
+  - Desktop UI is organized around `Personal Feed`, collapsible `Guidance`, and `Deep Dive Viewer`.
   - Desktop settings include appearance control with `system`, `dark`, and `light` theme modes.
 
 The app uses a dedicated newsletter curation pipeline that can call CrewAI agents to research a topic and produce Markdown plus safe HTML digest output.
@@ -84,6 +85,10 @@ Service domains:
   - LLM provider factory, search-tool policy, CrewAI construction, and compatibility wrappers.
 - `backend/common/services/newsletter/`
   - Active newsletter pipeline, built-in templates, Markdown/HTML compiler, digest persistence helpers.
+- `backend/common/services/intelligence_feed/`
+  - Lightweight Personal Feed card persistence, dedupe, scoring, and Deep Dive handoff.
+- `backend/common/services/ingestion/`
+  - Server folder upload staging, safe zip extraction, local document indexing, and restart cleanup.
 - `backend/common/services/memory/`
   - Memory sanitizer and vector DB helpers, including recent clipboard retrieval.
 - `backend/common/services/search/`
@@ -116,6 +121,10 @@ Routes:
 - `POST /auth/signup`
 - `POST /auth/login`
 - `POST /news/generate`
+- `GET /news/feed`
+- `POST /news/feed/{feed_id}/dismiss`
+- `POST /news/feed/{feed_id}/deep-dive`
+- `POST /news/ingest/folder`
 - `GET /news/history`
 - `GET /news/history/{digest_id}`
 - `POST /news/history/{digest_id}/archive`

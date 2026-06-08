@@ -20,6 +20,7 @@ Lumeward now supports two web auth modes.
 - FastAPI server:
   - trusted-LAN mode is intended for private network use only
   - interactive mode improves auth boundaries but still requires normal deployment hardening before public exposure
+  - folder upload accepts explicit `.zip` archives only through authenticated `/news/ingest/folder`
 - Desktop bridge:
   - loopback only
   - protected with a runtime-generated bridge token header
@@ -40,6 +41,13 @@ Lumeward now supports two web auth modes.
 - Desktop telemetry disabled by default unless the user opts in
 - Raw clipboard text disabled by default
 - Tool/network policy checks before external search requests
+- Server folder upload is disabled/enabled through `FOLDER_UPLOAD_ENABLED`.
+- Folder upload staging is constrained to `DATA_DIR / FOLDER_UPLOAD_DIR`.
+- `FOLDER_UPLOAD_DIR` must be relative and cannot escape `DATA_DIR`.
+- Upload cleanup deletes only managed staging files on server startup when `FOLDER_UPLOAD_DELETE_ON_RESTART=true`.
+- Upload validation rejects path traversal, absolute zip paths, symlinks, unsupported extensions, too many files, and archives larger than `FOLDER_UPLOAD_MAX_ARCHIVE_MB`.
+- Uploaded source files are indexed locally; indexed SQLite/Qdrant memory is not deleted by staging cleanup.
+- The default archive limit is `FOLDER_UPLOAD_MAX_ARCHIVE_MB=10240` for 10 GB, and operators can lower or raise it in `.env`.
 
 ## Deferred Items
 

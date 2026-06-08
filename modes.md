@@ -38,6 +38,7 @@ Trust boundary:
 Intended use:
 - backend API for browser clients
 - LAN or broader server deployment depending on auth profile and hardening
+- explicit `.zip` folder upload for local indexing through the React frontend or `/news/ingest/folder`
 
 How it starts:
 
@@ -63,10 +64,17 @@ Required config:
 - `.env`
 - `SECRET_KEY` for interactive server deployments
 - `CORS_ALLOWED_ORIGINS`
+- optional folder upload controls:
+  - `FOLDER_UPLOAD_ENABLED`
+  - `FOLDER_UPLOAD_DIR`
+  - `FOLDER_UPLOAD_DELETE_ON_RESTART`
+  - `FOLDER_UPLOAD_MAX_ARCHIVE_MB`
+  - `FOLDER_UPLOAD_MAX_FILES`
 
 Trust boundary:
 - do not treat raw server mode as internet-safe by default
 - deployment posture depends on auth mode, reverse proxy, TLS, and network controls
+- uploaded source files are staged under `DATA_DIR / FOLDER_UPLOAD_DIR`; cleanup applies only to that managed staging area
 
 ## Auth / Trust Profiles
 
@@ -266,9 +274,28 @@ ENGINE_TIMEOUT_SECONDS=30
 ENGINE_MAX_RETRIES=2
 ```
 
+Server folder upload:
+
+```env
+FOLDER_UPLOAD_ENABLED=true
+FOLDER_UPLOAD_DIR=uploads/folders
+FOLDER_UPLOAD_DELETE_ON_RESTART=true
+FOLDER_UPLOAD_MAX_ARCHIVE_MB=10240
+FOLDER_UPLOAD_MAX_FILES=500
+```
+
+Upload endpoint:
+
+```text
+POST /news/ingest/folder
+```
+
+The React Dashboard exposes this as `Upload Folder` in server mode. Uploads must be `.zip` archives. Staged upload files are kept until the next server restart when cleanup is enabled.
+
 ## Current Constraints
 
 - `untrusted` is documented terminology only; the code still uses `interactive`
 - desktop mode always resolves to trusted-lan style auth behavior
 - remote engine mode is for model requests, not general remote code execution
+- server folder upload is explicit archive ingestion, not live server-side folder watching
 - current public-internet posture still requires additional deployment hardening beyond the repo defaults
