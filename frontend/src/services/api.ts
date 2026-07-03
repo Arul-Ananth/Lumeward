@@ -1,14 +1,8 @@
-import { ApiError, apiRequest } from './http';
-
-export interface BillingReceipt {
-    deducted: number;
-    remaining: number | string;
-}
+import { apiRequest } from './http';
 
 export interface NewsletterResponse {
     topic: string;
     content: string;
-    bill: BillingReceipt;
 }
 
 export interface MemoryMetadata {
@@ -55,22 +49,11 @@ function normalizeMemory(item: RawMemoryRecord, index: number): MemoryRecord {
 }
 
 export const api = {
-    generateBriefing: async (topic: string, apiKeys?: { serper?: string; openai?: string }): Promise<NewsletterResponse> => {
-        try {
-            return await apiRequest<NewsletterResponse>('/news/generate', {
-                method: 'POST',
-                body: {
-                    topic,
-                    serper_api_key: apiKeys?.serper,
-                    openai_api_key: apiKeys?.openai,
-                },
-            });
-        } catch (error) {
-            if (error instanceof ApiError && error.status === 402) {
-                throw new Error('Insufficient Credits. Please Top Up.');
-            }
-            throw error;
-        }
+    generateBriefing: async (topic: string): Promise<NewsletterResponse> => {
+        return apiRequest<NewsletterResponse>('/news/generate', {
+            method: 'POST',
+            body: { topic },
+        });
     },
 
     sendFeedback: async (originalTopic: string, feedbackText: string, sentiment: string): Promise<void> => {

@@ -14,7 +14,7 @@ Status: archived reference. This document is not the active Lumeward architectur
   - Uses env-driven CORS allowlist (`CORS_ALLOWED_ORIGINS` via `settings.cors_origins()`).
 - Desktop mode (`backend/desktop/main.py`):
   - Starts PySide6 UI with qasync event loop.
-  - Provisions local desktop user account and wallet.
+  - Provisions a local desktop user account.
   - Starts local bridge API in separate process (`backend/desktop/services/api_server.py`) on loopback.
   - Enables optional OCR/snipping, file ingestion, and telemetry workers.
 

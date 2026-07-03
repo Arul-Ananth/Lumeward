@@ -15,6 +15,129 @@ _THEME_FILES = {
     THEME_MODE_LIGHT: "light_cyan.xml",
 }
 
+_THEME_QSS_TOKENS = {
+    THEME_MODE_LIGHT: {
+        "window_bg": "#f5f5f7",
+        "text": "#1c1c1e",
+        "group_bg": "#ffffff",
+        "border": "#d1d1d6",
+        "accent": "#007aff",
+        "input_bg": "#ffffff",
+        "input_border": "#c7c7cc",
+        "input_selection": "#007aff",
+        "primary_text": "#ffffff",
+        "secondary_text": "#3a3a3c",
+        "digest_bg": "#ffffff",
+        "log_bg": "#f2f2f7",
+        "card_bg": "#ffffff",
+        "insight_title": "#1c1c1e",
+        "label_block": "",
+        "button_block": "",
+        "disabled_block": "",
+    },
+    THEME_MODE_DARK: {
+        "window_bg": "#121212",
+        "text": "#e5e5ea",
+        "group_bg": "#1c1c1e",
+        "border": "#2c2c2e",
+        "accent": "#00f2fe",
+        "input_bg": "#18181a",
+        "input_border": "#2c2c2e",
+        "input_selection": "#00a7b5",
+        "primary_text": "#111112",
+        "secondary_text": "#c7c7cc",
+        "digest_bg": "#161617",
+        "log_bg": "#18181a",
+        "card_bg": "#1c1c1e",
+        "insight_title": "#f5f5f7",
+        "label_block": "QLabel {\n    color: #e5e5ea;\n}\n",
+        "button_block": """QPushButton {
+    background-color: #242426;
+    border: 1px solid #3a3a3c;
+    border-radius: 6px;
+    color: #e5e5ea;
+    padding: 8px 12px;
+}
+""",
+        "disabled_block": """QPushButton:disabled {
+    color: #6f6f73;
+    border-color: #2c2c2e;
+}
+""",
+    },
+}
+
+_LUMEWARD_QSS_TEMPLATE = """
+QMainWindow, QDialog, QScrollArea, QWidget {{
+    background-color: {window_bg};
+    color: {text};
+}}
+QGroupBox {{
+    background-color: {group_bg};
+    border: 1px solid {border};
+    border-radius: 8px;
+    margin-top: 18px;
+    padding: 14px;
+}}
+QGroupBox::title {{
+    color: {accent};
+    subcontrol-origin: margin;
+    left: 12px;
+    padding: 0 4px;
+}}
+{label_block}QLineEdit, QTextEdit, QTextBrowser, QComboBox {{
+    background-color: {input_bg};
+    border: 1px solid {input_border};
+    border-radius: 6px;
+    color: {text};
+    selection-background-color: {input_selection};
+}}
+QLineEdit:focus, QTextEdit:focus, QTextBrowser:focus, QComboBox:focus {{
+    border: 1px solid {accent};
+}}
+{button_block}QPushButton#primaryButton {{
+    background-color: {accent};
+    color: {primary_text};
+    border: 1px solid {accent};
+    border-radius: 6px;
+    font-weight: 700;
+}}
+QPushButton#secondaryButton, QToolButton#secondaryButton {{
+    background-color: transparent;
+    color: {secondary_text};
+    border: 1px solid {border};
+    border-radius: 6px;
+    padding: 8px 12px;
+}}
+{disabled_block}QTextBrowser#digestOutput {{
+    background-color: {digest_bg};
+    border: 1px solid {border};
+    border-radius: 8px;
+}}
+QTextEdit#executionLog {{
+    background-color: {log_bg};
+    border: 1px solid {border};
+    border-radius: 6px;
+    color: {secondary_text};
+}}
+QLabel#panelTitle {{
+    color: {accent};
+    font-weight: 700;
+}}
+QFrame#insightCard {{
+    background-color: {card_bg};
+    border: 1px solid {border};
+    border-radius: 8px;
+}}
+QLabel#insightTitle {{
+    color: {insight_title};
+    font-weight: 700;
+}}
+QLabel#insightMeta, QLabel#insightBullet, QLabel#insightTopics, QLabel#feedEmpty {{
+    color: {secondary_text};
+}}
+"""
+
 
 def normalize_theme_mode(mode: str | None) -> str:
     if not mode:
@@ -54,161 +177,7 @@ def apply_app_theme(app: QApplication, mode: str | None = None) -> str:
 
 
 def _lumeward_qss(effective_mode: str) -> str:
-    if effective_mode == THEME_MODE_LIGHT:
-        return """
-QMainWindow, QDialog, QScrollArea, QWidget {
-    background-color: #f5f5f7;
-    color: #1c1c1e;
-}
-QGroupBox {
-    background-color: #ffffff;
-    border: 1px solid #d1d1d6;
-    border-radius: 8px;
-    margin-top: 18px;
-    padding: 14px;
-}
-QGroupBox::title {
-    color: #007aff;
-    subcontrol-origin: margin;
-    left: 12px;
-    padding: 0 4px;
-}
-QLineEdit, QTextEdit, QTextBrowser, QComboBox {
-    background-color: #ffffff;
-    border: 1px solid #c7c7cc;
-    border-radius: 6px;
-    color: #1c1c1e;
-    selection-background-color: #007aff;
-}
-QLineEdit:focus, QTextEdit:focus, QTextBrowser:focus, QComboBox:focus {
-    border: 1px solid #007aff;
-}
-QPushButton#primaryButton {
-    background-color: #007aff;
-    color: #ffffff;
-    border: 1px solid #007aff;
-    border-radius: 6px;
-    font-weight: 700;
-}
-QPushButton#secondaryButton, QToolButton#secondaryButton {
-    background-color: transparent;
-    color: #3a3a3c;
-    border: 1px solid #d1d1d6;
-    border-radius: 6px;
-    padding: 8px 12px;
-}
-QTextBrowser#digestOutput {
-    background-color: #ffffff;
-    border: 1px solid #d1d1d6;
-    border-radius: 8px;
-}
-QTextEdit#executionLog {
-    background-color: #f2f2f7;
-    border: 1px solid #d1d1d6;
-    border-radius: 6px;
-    color: #3a3a3c;
-}
-QLabel#panelTitle {
-    color: #007aff;
-    font-weight: 700;
-}
-QFrame#insightCard {
-    background-color: #ffffff;
-    border: 1px solid #d1d1d6;
-    border-radius: 8px;
-}
-QLabel#insightTitle {
-    color: #1c1c1e;
-    font-weight: 700;
-}
-QLabel#insightMeta, QLabel#insightBullet, QLabel#insightTopics, QLabel#feedEmpty {
-    color: #3a3a3c;
-}
-"""
-    return """
-QMainWindow, QDialog, QScrollArea, QWidget {
-    background-color: #121212;
-    color: #e5e5ea;
-}
-QGroupBox {
-    background-color: #1c1c1e;
-    border: 1px solid #2c2c2e;
-    border-radius: 8px;
-    margin-top: 18px;
-    padding: 14px;
-}
-QGroupBox::title {
-    color: #00f2fe;
-    subcontrol-origin: margin;
-    left: 12px;
-    padding: 0 4px;
-}
-QLabel {
-    color: #e5e5ea;
-}
-QLineEdit, QTextEdit, QTextBrowser, QComboBox {
-    background-color: #18181a;
-    border: 1px solid #2c2c2e;
-    border-radius: 6px;
-    color: #e5e5ea;
-    selection-background-color: #00a7b5;
-}
-QLineEdit:focus, QTextEdit:focus, QTextBrowser:focus, QComboBox:focus {
-    border: 1px solid #00f2fe;
-}
-QPushButton {
-    background-color: #242426;
-    border: 1px solid #3a3a3c;
-    border-radius: 6px;
-    color: #e5e5ea;
-    padding: 8px 12px;
-}
-QPushButton#primaryButton {
-    background-color: #00f2fe;
-    color: #111112;
-    border: 1px solid #00f2fe;
-    border-radius: 6px;
-    font-weight: 700;
-}
-QPushButton#secondaryButton, QToolButton#secondaryButton {
-    background-color: transparent;
-    color: #c7c7cc;
-    border: 1px solid #2c2c2e;
-    border-radius: 6px;
-    padding: 8px 12px;
-}
-QPushButton:disabled {
-    color: #6f6f73;
-    border-color: #2c2c2e;
-}
-QTextBrowser#digestOutput {
-    background-color: #161617;
-    border: 1px solid #2c2c2e;
-    border-radius: 8px;
-}
-QTextEdit#executionLog {
-    background-color: #18181a;
-    border: 1px solid #2c2c2e;
-    border-radius: 6px;
-    color: #c7c7cc;
-}
-QLabel#panelTitle {
-    color: #00f2fe;
-    font-weight: 700;
-}
-QFrame#insightCard {
-    background-color: #1c1c1e;
-    border: 1px solid #2c2c2e;
-    border-radius: 8px;
-}
-QLabel#insightTitle {
-    color: #f5f5f7;
-    font-weight: 700;
-}
-QLabel#insightMeta, QLabel#insightBullet, QLabel#insightTopics, QLabel#feedEmpty {
-    color: #c7c7cc;
-}
-"""
+    return _LUMEWARD_QSS_TEMPLATE.format(**_THEME_QSS_TOKENS[effective_mode]).strip()
 
 
 def install_system_theme_listener(app: QApplication) -> None:

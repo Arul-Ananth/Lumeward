@@ -5,7 +5,7 @@ import logging
 from PySide6.QtCore import QThread, Signal
 from sqlmodel import Session
 
-from backend.common.database import engine
+from backend.common.database import get_engine
 from backend.common.services.intelligence_feed.feed_router import IntelligenceFeedRouter
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ class FeedRefreshWorker(QThread):
 
     def run(self) -> None:
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 cards = IntelligenceFeedRouter().list_cards(session, self.user_id)
             self.cards_ready.emit(cards)
         except Exception as exc:
@@ -40,7 +40,7 @@ class FeedDismissWorker(QThread):
 
     def run(self) -> None:
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 IntelligenceFeedRouter().dismiss(session, self.user_id, self.feed_id)
             self.completed.emit(self.feed_id)
         except Exception as exc:

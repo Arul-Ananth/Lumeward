@@ -10,7 +10,6 @@ import Typography from '@mui/material/Typography';
 import { getApiBaseUrl } from './services/http';
 import { useAuth } from './hooks/useAuth';
 import { AuthProvider } from './providers/AuthProvider';
-import { SettingsProvider } from './providers/SettingsProvider';
 import AppTheme from './theme/AppTheme';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
@@ -78,11 +77,9 @@ export default function App() {
   return (
     <AppTheme>
       <AuthProvider>
-        <SettingsProvider>
-          <Router>
-            <AppRoutes />
-          </Router>
-        </SettingsProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
       </AuthProvider>
     </AppTheme>
   );

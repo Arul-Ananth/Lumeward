@@ -41,3 +41,8 @@
 - Backend compile check: `python -m compileall backend`
 - Frontend build check: `npm run build` (in `frontend/`)
 - Run targeted scripts in `scripts/verify/` for affected areas.
+- Storage changes must run `verify_desktop_database_upgrade.py`,
+  `verify_manual_database_management.py`, `verify_storage_modes.py`, and the
+  relevant Qdrant verification scripts.
+- Server schema commands live in `scripts/dev/database.py`; destructive refresh
+  must always require exact database-name confirmation.

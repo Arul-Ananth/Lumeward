@@ -1,22 +1,28 @@
 import json
 import logging
-import os
 import re
 import threading
-import uuid
 from datetime import datetime
 from typing import Any
 
 from qdrant_client import QdrantClient
+from qdrant_client.http.exceptions import ApiException
 from qdrant_client.http import models
 from sqlmodel import Session, select
 
 from backend.common.config import AppMode, settings
-from backend.common.database import engine
+from backend.common.database import session_scope
 from backend.common.models.sql import EventRaw
+from backend.common.services.memory.point_ids import stable_point_id
 
 logger = logging.getLogger(__name__)
 
+
+class QdrantUnavailableError(RuntimeError):
+    """Raised when server-mode Qdrant storage cannot complete an operation."""
+
+
+_QDRANT_CONNECTION_ERRORS = (ApiException, ConnectionError, OSError, TimeoutError)
 _embedder: Any | None = None
 _embedder_lock = threading.Lock()
 _client: QdrantClient | None = None
@@ -51,10 +57,14 @@ _CLIPBOARD_STOPWORDS = {
 def _create_client() -> QdrantClient:
     if settings.APP_MODE == AppMode.DESKTOP:
         return QdrantClient(path=str(settings.DATA_DIR / "qdrant_db"))
-    qdrant_url = os.getenv("QDRANT_URL")
-    if qdrant_url:
-        return QdrantClient(url=qdrant_url)
-    return QdrantClient(path=str(settings.DATA_DIR / "qdrant_db"))
+    if not settings.QDRANT_URL.strip():
+        raise RuntimeError("Server mode requires QDRANT_URL; embedded Qdrant is desktop-only.")
+    return QdrantClient(
+        url=settings.QDRANT_URL.strip(),
+        api_key=settings.QDRANT_API_KEY.strip() or None,
+        timeout=settings.QDRANT_TIMEOUT_SECONDS,
+        prefer_grpc=settings.QDRANT_PREFER_GRPC,
+    )
 
 
 def get_client() -> QdrantClient:
@@ -93,19 +103,48 @@ def ensure_collection(name: str) -> None:
     qdrant_client = get_client()
     if qdrant_client.collection_exists(name):
         return
-    qdrant_client.create_collection(
-        collection_name=name,
-        vectors_config=models.VectorParams(
-            size=384,
-            distance=models.Distance.COSINE,
-        ),
-    )
+    try:
+        qdrant_client.create_collection(
+            collection_name=name,
+            vectors_config=models.VectorParams(
+                size=384,
+                distance=models.Distance.COSINE,
+            ),
+        )
+    except Exception:
+        if not qdrant_client.collection_exists(name):
+            raise
+
+
+def check_qdrant_ready() -> None:
+    get_client().get_collections()
+
+
+def initialize_qdrant_collections() -> None:
+    for collection in (
+        settings.QDRANT_COLLECTION_USER_DOCS,
+        settings.QDRANT_COLLECTION_SESSION_MEMORY,
+        settings.QDRANT_COLLECTION_USER_PROFILE,
+    ):
+        ensure_collection(collection)
+
+
+def close_qdrant() -> None:
+    global _client
+    with _client_lock:
+        if _client is not None:
+            _client.close()
+        _client = None
 
 
 def _query_collection(collection: str, user_id: int, query: str, limit: int = 3) -> list[str]:
     try:
         ensure_collection(collection)
-        query_vector = get_embedder().encode(query).tolist()
+    except _QDRANT_CONNECTION_ERRORS as exc:
+        return _handle_qdrant_unavailable("ensure collection", collection, exc, [])
+
+    query_vector = get_embedder().encode(query).tolist()
+    try:
         results = client.query_points(
             collection_name=collection,
             query=query_vector,
@@ -120,49 +159,54 @@ def _query_collection(collection: str, user_id: int, query: str, limit: int = 3)
             limit=limit,
         ).points
         return [hit.payload.get("document", "") for hit in results if hit.payload.get("document")]
-    except Exception as exc:
-        logger.exception("Vector DB query error (%s): %s", collection, exc)
-        return []
+    except _QDRANT_CONNECTION_ERRORS as exc:
+        return _handle_qdrant_unavailable("query", collection, exc, [])
 
 
 def get_user_context(user_id: int, topic: str) -> str:
-    try:
-        documents = _query_collection(settings.QDRANT_COLLECTION_USER_PROFILE, user_id, topic, limit=3)
-        return "\n".join(documents) if documents else "No specific preferences found."
-    except Exception as exc:
-        logger.exception("Vector DB error: %s", exc)
-        return "No context available."
+    documents = _query_collection(settings.QDRANT_COLLECTION_USER_PROFILE, user_id, topic, limit=3)
+    return "\n".join(documents) if documents else "No specific preferences found."
 
 
 def save_feedback(user_id: int, topic: str, feedback: str, sentiment: str) -> None:
-    ensure_collection(settings.QDRANT_COLLECTION_USER_PROFILE)
+    collection = settings.QDRANT_COLLECTION_USER_PROFILE
+    try:
+        ensure_collection(collection)
+    except _QDRANT_CONNECTION_ERRORS as exc:
+        _handle_qdrant_unavailable("ensure collection", collection, exc, None)
+        return
+
     text = f"Topic: {topic}. User Feedback: {feedback}. Sentiment: {sentiment}"
     vector = get_embedder().encode(text).tolist()
-    point_id = str(uuid.uuid4())
+    point_id = stable_point_id("feedback", user_id, topic, feedback, sentiment)
 
-    client.upsert(
-        collection_name=settings.QDRANT_COLLECTION_USER_PROFILE,
-        points=[
-            models.PointStruct(
-                id=point_id,
-                vector=vector,
-                payload={
-                    "document": text,
-                    "user_id": str(user_id),
-                    "topic": topic,
-                    "sentiment": sentiment,
-                    "timestamp": datetime.now().isoformat(),
-                },
-            )
-        ],
-    )
+    try:
+        client.upsert(
+            collection_name=collection,
+            points=[
+                models.PointStruct(
+                    id=point_id,
+                    vector=vector,
+                    payload={
+                        "document": text,
+                        "user_id": str(user_id),
+                        "topic": topic,
+                        "sentiment": sentiment,
+                        "timestamp": datetime.now().isoformat(),
+                    },
+                )
+            ],
+        )
+    except _QDRANT_CONNECTION_ERRORS as exc:
+        _handle_qdrant_unavailable("upsert", collection, exc, None)
 
 
 def fetch_memories(user_id: int):
+    collection = settings.QDRANT_COLLECTION_USER_PROFILE
     try:
-        ensure_collection(settings.QDRANT_COLLECTION_USER_PROFILE)
+        ensure_collection(collection)
         response = client.scroll(
-            collection_name=settings.QDRANT_COLLECTION_USER_PROFILE,
+            collection_name=collection,
             scroll_filter=models.Filter(
                 must=[
                     models.FieldCondition(
@@ -183,9 +227,25 @@ def fetch_memories(user_id: int):
             }
             for point in points
         ]
-    except Exception as exc:
-        logger.exception("Error fetching memories: %s", exc)
-        return []
+    except _QDRANT_CONNECTION_ERRORS as exc:
+        return _handle_qdrant_unavailable("scroll", collection, exc, [])
+
+
+def _handle_qdrant_unavailable(operation: str, collection: str, exc: Exception, desktop_fallback):
+    logger.error(
+        "Qdrant operation failed",
+        extra={
+            "qdrant_operation": operation,
+            "qdrant_collection": collection,
+            "error_type": type(exc).__name__,
+        },
+        exc_info=True,
+    )
+    if settings.APP_MODE == AppMode.SERVER:
+        raise QdrantUnavailableError(
+            f"Qdrant unavailable during {operation} for collection {collection}."
+        ) from exc
+    return desktop_fallback
 
 
 def get_memory_context(user_id: int, topic: str, session_id: str | None = None) -> str:
@@ -262,7 +322,7 @@ def _matching_clipboard_entries(terms: list[str], session_id: str | None, limit:
             if len(entries) >= limit:
                 break
 
-    with Session(engine) as session:
+    with session_scope() as session:
         if session_id:
             current_session = session.exec(
                 select(EventRaw)

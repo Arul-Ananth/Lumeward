@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -36,6 +37,9 @@ def apply_cli_overrides(args: argparse.Namespace) -> tuple[AppMode, bool]:
         server_host=args.host,
         server_port=args.port,
     )
+    os.environ["APP_MODE"] = app_mode.value
+    if auth_mode is not None:
+        os.environ["AUTH_MODE"] = auth_mode.value
     settings.configure()
     return app_mode, args.reload
 
@@ -45,6 +49,7 @@ def start_server(*, reload: bool = False) -> None:
     logger.info("Starting Application as Server...")
     if settings.auth_mode() != AuthMode.TRUSTED_LAN and not settings.SECRET_KEY:
         raise RuntimeError("SECRET_KEY must be set in .env for server mode.")
+    settings.validate_storage_configuration()
 
     try:
         import uvicorn
@@ -60,7 +65,7 @@ def start_server(*, reload: bool = False) -> None:
             "reload": reload,
         }
         if not reload:
-            uvicorn_kwargs["workers"] = 1
+            uvicorn_kwargs["workers"] = settings.SERVER_WORKERS
 
         uvicorn.run(**uvicorn_kwargs)
 

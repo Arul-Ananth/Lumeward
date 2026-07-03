@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from sqlmodel import Session, select
 
 from backend.common.config import settings
-from backend.common.models.sql import AuthIdentity, AuthSession, User, UserWallet
+from backend.common.models.sql import AuthIdentity, AuthSession, User
 from backend.common.services.auth.auth_utils import get_password_hash
 
 INTERACTIVE_PROVIDER = "interactive_password"
@@ -43,16 +43,6 @@ def get_identity_by_email(session: Session, provider: str, email: str) -> AuthId
         AuthIdentity.email == email.strip().lower(),
     )
     return session.exec(statement).first()
-
-
-def ensure_wallet(session: Session, user_id: int, default_balance: int = 50) -> UserWallet:
-    wallet = session.get(UserWallet, user_id)
-    if wallet is None:
-        wallet = UserWallet(user_id=user_id, balance=default_balance)
-        session.add(wallet)
-        session.commit()
-        session.refresh(wallet)
-    return wallet
 
 
 def ensure_identity(
@@ -101,7 +91,6 @@ def create_user_with_password_identity(
     full_name: str,
     email: str,
     password: str,
-    default_balance: int = 50,
 ) -> tuple[User, AuthIdentity]:
     normalized_email = email.strip().lower()
     if get_user_by_email(session, normalized_email):
@@ -125,7 +114,6 @@ def create_user_with_password_identity(
         email=normalized_email,
         password_hash=password_hash,
     )
-    ensure_wallet(session, user.id, default_balance)
     return user, identity
 
 
@@ -140,7 +128,6 @@ def ensure_trusted_lan_user(session: Session) -> tuple[User, AuthIdentity]:
         session.add(user)
         session.commit()
         session.refresh(user)
-    ensure_wallet(session, user.id, default_balance=0)
     identity = ensure_identity(
         session,
         user=user,
@@ -158,7 +145,6 @@ def ensure_desktop_local_user(
     *,
     email: str,
     full_name: str,
-    default_balance: int,
 ) -> tuple[User, AuthIdentity]:
     user = get_user_by_email(session, email)
     if user is None:
@@ -170,7 +156,6 @@ def ensure_desktop_local_user(
         session.add(user)
         session.commit()
         session.refresh(user)
-    ensure_wallet(session, user.id, default_balance=default_balance)
     identity = ensure_identity(
         session,
         user=user,

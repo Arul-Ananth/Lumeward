@@ -19,6 +19,8 @@ Lumeward now supports two web auth modes.
 
 - FastAPI server:
   - trusted-LAN mode is intended for private network use only
+  - server storage requires PostgreSQL and a Qdrant service configured through
+    `QDRANT_URL`; localhost is supported, while embedded fallback is rejected
   - interactive mode improves auth boundaries but still requires normal deployment hardening before public exposure
   - folder upload accepts explicit `.zip` archives only through authenticated `/news/ingest/folder`
 - Desktop bridge:
@@ -45,9 +47,14 @@ Lumeward now supports two web auth modes.
 - Folder upload staging is constrained to `DATA_DIR / FOLDER_UPLOAD_DIR`.
 - `FOLDER_UPLOAD_DIR` must be relative and cannot escape `DATA_DIR`.
 - Upload cleanup deletes only managed staging files on server startup when `FOLDER_UPLOAD_DELETE_ON_RESTART=true`.
-- Upload validation rejects path traversal, absolute zip paths, symlinks, unsupported extensions, too many files, and archives larger than `FOLDER_UPLOAD_MAX_ARCHIVE_MB`.
-- Uploaded source files are indexed locally; indexed SQLite/Qdrant memory is not deleted by staging cleanup.
-- The default archive limit is `FOLDER_UPLOAD_MAX_ARCHIVE_MB=10240` for 10 GB, and operators can lower or raise it in `.env`.
+- Upload validation rejects path traversal, absolute zip paths, symlinks,
+  unsupported extensions, too many files, compressed archives larger than
+  `FOLDER_UPLOAD_MAX_ARCHIVE_MB`, and archives that expand beyond
+  `FOLDER_UPLOAD_MAX_EXPANDED_MB`.
+- Uploaded source files are indexed into the active relational database and
+  Qdrant; indexed state is not deleted by staging cleanup.
+- The default compressed archive limit is 250 MB and the default expanded limit
+  is 1000 MB; operators can lower or raise both values in `.env`.
 
 ## Deferred Items
 

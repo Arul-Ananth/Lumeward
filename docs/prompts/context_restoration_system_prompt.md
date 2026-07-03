@@ -71,7 +71,8 @@ Shared backend:
 - `backend/common/config.py`
   - Shared settings loaded from project-root `.env`, plus runtime override handling.
 - `backend/common/database.py`
-  - SQLModel engine, session provider, startup migration helper.
+  - mode-aware SQLModel engine/session provider, desktop compatibility
+    migrations, PostgreSQL pooling, and server schema-version validation.
 - `backend/common/models/schemas.py`
   - Pydantic request/response models.
 - `backend/common/models/sql.py`
@@ -143,7 +144,6 @@ Relevant files:
 - `backend/server/routers/auth.py`
 - `backend/server/routers/news.py`
 - `backend/server/dependencies.py`
-- `backend/server/services/billing.py`
 
 ## 7. Desktop Mode
 
@@ -343,10 +343,20 @@ LLM/Search:
 
 Storage/telemetry:
 
+- `DATABASE_URL`
+- `DB_POOL_SIZE`
+- `DB_MAX_OVERFLOW`
+- `DB_POOL_TIMEOUT_SECONDS`
+- `DB_POOL_RECYCLE_SECONDS`
+- `SERVER_WORKERS`
 - `DATA_COLLECTION_ENABLED`
 - `CLIPBOARD_COLLECTION_ENABLED`
 - `FOLDER_WATCH_ENABLED`
 - `QDRANT_URL`
+- `QDRANT_API_KEY`
+- `QDRANT_TIMEOUT_SECONDS`
+- `QDRANT_PREFER_GRPC`
+- `INGESTION_CONCURRENCY`
 
 ## 14. Current Startup Guidance
 
@@ -354,14 +364,16 @@ Server mode:
 
 ```powershell
 cd C:\Dev\lumeward
-.\venv_win\Scripts\python.exe backend\main.py --mode server
+.\venv_win\Scripts\python.exe scripts\dev\database.py status
+.\venv_win\Scripts\python.exe scripts\dev\database.py initialize
+.\venv_win\Scripts\python.exe backend\main.py
 ```
 
 Desktop mode:
 
 ```powershell
 cd C:\Dev\lumeward
-.\venv_win\Scripts\python.exe backend\main.py --mode desktop
+.\venv_win\Scripts\python.exe backend\main.py
 ```
 
 Interactive server mode:
@@ -382,11 +394,13 @@ Note:
 
 - CLI flags override env settings.
 - `APP_MODE`, `AUTH_MODE`, `SERVER_HOST`, and `SERVER_PORT` remain valid env inputs.
+- Normal mode switching changes only `APP_MODE` in `.env` and requires restart.
+- Server schema refresh is explicit and destructive through
+  `scripts/dev/database.py`; startup never performs schema migration.
 
 ## 15. Current Known Caveats
 
 - `untrusted` is documentation terminology; the runtime auth enum is still `interactive`.
-- Billing still uses placeholder token counts in `backend/server/routers/news.py`.
 - `Web Search (Google)` is currently a renamed subclass, not a distinct Google API implementation.
 - Some telemetry code still uses deprecated `datetime.utcnow()` and should be cleaned up later.
 - Heavy embedding initialization still exists in memory/vector paths.

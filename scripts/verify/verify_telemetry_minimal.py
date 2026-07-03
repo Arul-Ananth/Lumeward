@@ -7,13 +7,13 @@ root = Path(__file__).resolve().parents[2]
 if str(root) not in sys.path:
     sys.path.append(str(root))
 
-from backend.common.database import create_db_and_tables, engine
+from backend.common.database import create_db_and_tables, get_engine
 from backend.common.models.sql import DerivedMemory, EventRaw, FilesIndex, FolderConsent
 
 
 def main() -> None:
     create_db_and_tables()
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         event = EventRaw(
             event_type="test_event",
             session_id="test_session",

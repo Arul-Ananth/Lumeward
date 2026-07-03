@@ -16,7 +16,7 @@ if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 from backend.common.config import AppMode, settings
-from backend.common.database import create_db_and_tables, engine
+from backend.common.database import create_db_and_tables, get_engine
 from backend.common.logging import configure_logging
 from backend.common.services.auth.store import ensure_desktop_local_user
 from backend.desktop.preferences import apply_llm_preferences_to_settings, get_theme_mode
@@ -34,12 +34,11 @@ logger = logging.getLogger(__name__)
 
 def ensure_local_user() -> int:
     """Ensure a fixed local user exists for Desktop mode (no auth)."""
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         user, _identity = ensure_desktop_local_user(
             session,
             email=LOCAL_USER_EMAIL,
             full_name=LOCAL_USER_NAME,
-            default_balance=999999,
         )
         return user.id
 

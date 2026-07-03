@@ -62,6 +62,8 @@ Exposure:
 
 Required config:
 - `.env`
+- `DATABASE_URL` using PostgreSQL
+- `QDRANT_URL` for a local or remote Qdrant service
 - `SECRET_KEY` for interactive server deployments
 - `CORS_ALLOWED_ORIGINS`
 - optional folder upload controls:
@@ -70,6 +72,23 @@ Required config:
   - `FOLDER_UPLOAD_DELETE_ON_RESTART`
   - `FOLDER_UPLOAD_MAX_ARCHIVE_MB`
   - `FOLDER_UPLOAD_MAX_FILES`
+
+First-time schema setup:
+
+```powershell
+.\venv_win\Scripts\python.exe scripts\dev\database.py status
+.\venv_win\Scripts\python.exe scripts\dev\database.py initialize
+```
+
+Pre-release destructive refresh:
+
+```powershell
+.\venv_win\Scripts\python.exe scripts\dev\database.py refresh --confirm lumeward
+.\venv_win\Scripts\python.exe scripts\dev\database.py refresh-all --confirm lumeward
+```
+
+The application never creates the PostgreSQL database or mutates its schema at
+startup. `refresh-all` also recreates Lumeward's Qdrant collections.
 
 Trust boundary:
 - do not treat raw server mode as internet-safe by default
@@ -242,6 +261,10 @@ Examples:
 - `--mode desktop` overrides `APP_MODE=SERVER`
 - `--auth-mode interactive` overrides `AUTH_MODE=trusted_lan`
 - `--host` and `--port` override server env values in server mode only
+
+For normal operation, keep both storage configurations in `.env`, change only
+`APP_MODE`, and restart. `DESKTOP` ignores server storage URLs; `SERVER` requires
+them.
 
 ## Practical Commands
 

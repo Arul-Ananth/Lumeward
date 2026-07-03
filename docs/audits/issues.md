@@ -26,18 +26,16 @@ Checks run during cleanup:
 
 ## Remaining Follow-Up Items
 
-1. Billing still uses estimated token counts
-- Evidence: `backend/server/routers/news.py` records fixed `input_tok` and `output_tok` values.
-- Impact: server-mode usage logs and credit deductions are approximate.
-
-2. "Web Search (Google)" is metadata-only
+1. "Web Search (Google)" is metadata-only
 - Evidence: `backend/common/services/search/web_search.py` subclasses the generic search tool without distinct Google API behavior.
 - Impact: the tool name can imply a different provider than the implementation actually uses.
 
-3. Some compatibility modules remain intentionally
+2. Some compatibility modules remain intentionally
 - Evidence: `backend/server/dependencies.py` and `backend/common/services/llm/crew_agent.py` are retained as compatibility shims.
 - Impact: they are low-cost, but should not be used for new code.
 
-4. Runtime data is intentionally local and ignored
-- Evidence: server mode uses local SQLite and Qdrant paths when no external services are configured.
-- Impact: deleting ignored local data resets local app state.
+3. Runtime storage is mode-specific
+- Evidence: desktop mode uses ignored local SQLite/embedded-Qdrant data; server
+  mode requires PostgreSQL and a configured Qdrant service.
+- Impact: desktop data remains local, while server deployments must provision
+  and explicitly initialize their storage dependencies.

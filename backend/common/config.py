@@ -3,6 +3,7 @@ import os
 import sys
 from enum import Enum
 from pathlib import Path
+from urllib.parse import urlparse
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     SERVER_HOST: str = "127.0.0.1"
     SERVER_PORT: int = 8000
+    SERVER_WORKERS: int = 1
     CORS_ALLOWED_ORIGINS: str = "http://localhost:5173"
     TRUSTED_LAN_MODE: bool = True
     AUTH_MODE: AuthMode | None = None
@@ -53,6 +55,16 @@ class Settings(BaseSettings):
 
     # Data Storage
     DATA_DIR: Path = DEFAULT_DATA_DIR
+    DATABASE_URL: str = ""
+    DB_POOL_SIZE: int = 10
+    DB_MAX_OVERFLOW: int = 5
+    DB_POOL_TIMEOUT_SECONDS: int = 30
+    DB_POOL_RECYCLE_SECONDS: int = 1800
+    QDRANT_URL: str = ""
+    QDRANT_API_KEY: str = ""
+    QDRANT_TIMEOUT_SECONDS: int = 30
+    QDRANT_PREFER_GRPC: bool = False
+    INGESTION_CONCURRENCY: int = 2
 
     # Desktop Data Collection
     DATA_COLLECTION_ENABLED: bool = False
@@ -67,7 +79,8 @@ class Settings(BaseSettings):
     FOLDER_UPLOAD_ENABLED: bool = True
     FOLDER_UPLOAD_DIR: str = "uploads/folders"
     FOLDER_UPLOAD_DELETE_ON_RESTART: bool = True
-    FOLDER_UPLOAD_MAX_ARCHIVE_MB: int = 10240
+    FOLDER_UPLOAD_MAX_ARCHIVE_MB: int = 250
+    FOLDER_UPLOAD_MAX_EXPANDED_MB: int = 1000
     FOLDER_UPLOAD_MAX_FILES: int = 500
     QDRANT_COLLECTION_USER_DOCS: str = "user_documents"
     QDRANT_COLLECTION_SESSION_MEMORY: str = "session_memory"
@@ -92,6 +105,36 @@ class Settings(BaseSettings):
 
     def is_trusted_lan_auth(self) -> bool:
         return self.auth_mode() == AuthMode.TRUSTED_LAN
+
+    def database_url(self) -> str:
+        if self.APP_MODE == AppMode.DESKTOP:
+            return f"sqlite:///{self.DATA_DIR / 'lumeward.db'}"
+        configured = self.DATABASE_URL.strip()
+        if configured:
+            return configured
+        raise RuntimeError("Server mode requires DATABASE_URL using PostgreSQL.")
+
+    def validate_storage_configuration(self) -> None:
+        if self.APP_MODE == AppMode.DESKTOP:
+            return
+        database_url = self.DATABASE_URL.strip().lower()
+        if not database_url.startswith(("postgresql://", "postgresql+psycopg://")):
+            raise RuntimeError("Server mode requires DATABASE_URL using PostgreSQL.")
+        if not self.QDRANT_URL.strip():
+            raise RuntimeError("Server mode requires QDRANT_URL; embedded Qdrant is desktop-only.")
+        if self.SERVER_WORKERS < 1:
+            raise RuntimeError("SERVER_WORKERS must be at least 1.")
+        if self.DB_POOL_SIZE < 1 or self.DB_MAX_OVERFLOW < 0:
+            raise RuntimeError("Database pool settings are invalid.")
+        if self.DB_POOL_TIMEOUT_SECONDS < 1 or self.DB_POOL_RECYCLE_SECONDS < 1:
+            raise RuntimeError("Database pool timeouts must be positive.")
+        if self.QDRANT_TIMEOUT_SECONDS < 1:
+            raise RuntimeError("QDRANT_TIMEOUT_SECONDS must be positive.")
+        if self.INGESTION_CONCURRENCY < 1:
+            raise RuntimeError("INGESTION_CONCURRENCY must be at least 1.")
+        qdrant_url = urlparse(self.QDRANT_URL.strip())
+        if qdrant_url.scheme not in {"http", "https"} or not qdrant_url.netloc:
+            raise RuntimeError("QDRANT_URL must be an absolute http:// or https:// URL.")
 
     def engine_model_name(self) -> str:
         return self.ENGINE_MODEL_NAME.strip() or self.OPENAI_MODEL_NAME

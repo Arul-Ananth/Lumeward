@@ -5,7 +5,7 @@ import logging
 from PySide6.QtCore import QThread, Signal
 from sqlmodel import Session
 
-from backend.common.database import engine
+from backend.common.database import get_engine
 from backend.common.services.intelligence_feed.feed_router import IntelligenceFeedRouter
 
 logger = logging.getLogger(__name__)
@@ -21,7 +21,7 @@ class FeedProcessorWorker(QThread):
 
     def run(self) -> None:
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 created = IntelligenceFeedRouter().process_new_events(session, self.user_id)
             self.processed.emit(created)
         except Exception as exc:

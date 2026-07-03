@@ -17,10 +17,7 @@ import { api } from '../services/api';
 import type { MemoryRecord, NewsletterResponse } from '../services/api';
 import CustomAppBar from '../components/CustomAppBar';
 
-import { useSettings } from '../hooks/useSettings';
-
 const Dashboard = () => {
-    const { apiKey, serperKey } = useSettings();
     const [topic, setTopic] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<NewsletterResponse | null>(null);
@@ -29,7 +26,6 @@ const Dashboard = () => {
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMsg, setSnackbarMsg] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
-    const [credits, setCredits] = useState<number | string | null>(null);
     const [uploading, setUploading] = useState(false);
     const [uploadStatus, setUploadStatus] = useState('');
     const [uploadError, setUploadError] = useState('');
@@ -42,22 +38,12 @@ const Dashboard = () => {
         setErrorMsg('');
 
         try {
-            const data = await api.generateBriefing(topic, {
-                serper: serperKey,
-                openai: apiKey
-            });
+            const data = await api.generateBriefing(topic);
             setResult(data);
-            if (data.bill) {
-                setCredits(data.bill.remaining);
-            }
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
             console.error(error);
-            if (message.includes("Credits")) {
-                setErrorMsg(message);
-            } else {
-                setErrorMsg("Connection failed. Please check backend terminal for errors.");
-            }
+            setErrorMsg(message || "Connection failed. Please check backend terminal for errors.");
         } finally {
             setLoading(false);
         }
@@ -125,12 +111,6 @@ const Dashboard = () => {
 
             {/* FIX: flexGrow: 1 pushes the bottom of the container to the bottom of the viewport */}
             <Container maxWidth={false} component="main" sx={{ mt: 4, mb: 4, flexGrow: 1 }}>
-                {credits !== null && (
-                    <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                        <Chip label={`Credits Remaining: ${credits}`} color="primary" variant="outlined" />
-                    </Box>
-                )}
-
                 {tabIndex === 0 ? (
                     <Grid container spacing={3}>
                         <Grid size={{ xs: 12, md: 4 }}>

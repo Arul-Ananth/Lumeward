@@ -1,29 +1,26 @@
-# Migration Strategy
+# Schema Management Strategy
 
-The project now uses a lightweight application-managed migration runner in `backend/common/database.py`.
+Lumeward intentionally uses separate schema policies for desktop and server
+storage during the pre-release phase.
 
-## Current responsibilities
+## Desktop
 
-- preserve older installs that predate `DerivedMemory.user_id`
-- backfill `AuthIdentity` rows for existing `User` records
-- ensure wallet rows exist for migrated users
-- provide a stable place for future auth/storage migrations
+- SQLite remains self-initializing through `SQLModel.metadata.create_all()`.
+- `SchemaMigration` records the small ordered compatibility migrations needed
+  to preserve existing desktop installations.
+- Desktop startup never reads `DATABASE_URL` or uses the server database.
 
-## Current migration model
+## Server
 
-- `SQLModel.metadata.create_all()` creates the latest tables first
-- a `SchemaMigration` table records applied migration ids
-- ordered Python migrations run once per database
+- PostgreSQL databases and roles are created by an administrator.
+- Application startup only checks connectivity and `ApplicationSchema.version`;
+  it never creates, drops, or upgrades tables.
+- `python scripts/dev/database.py initialize` creates an empty schema.
+- `status` reports connectivity and schema readiness.
+- `refresh --confirm <database>` deletes and recreates PostgreSQL application
+  tables.
+- `refresh-all --confirm <database>` also recreates Lumeward Qdrant collections.
 
-## Current auth-related schema additions
-
-- `AuthIdentity`: provider-specific identity records decoupled from business user data
-- `AuthSession`: server-stored opaque interactive sessions
-- `SchemaMigration`: applied migration tracking
-
-## Rules for future migrations
-
-1. make each migration idempotent enough to survive retries safely
-2. preserve existing user access whenever possible
-3. keep trusted-LAN synthetic identities explicit, not implicit special cases
-4. use migrations for schema changes instead of ad-hoc startup writes in unrelated modules
+This reset-oriented policy is acceptable only while server data is disposable.
+Formal versioned migrations must be introduced before production data needs to
+survive schema changes.

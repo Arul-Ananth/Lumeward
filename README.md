@@ -59,7 +59,8 @@ Configure cleanup and limits in `.env`:
 FOLDER_UPLOAD_ENABLED=true
 FOLDER_UPLOAD_DIR=uploads/folders
 FOLDER_UPLOAD_DELETE_ON_RESTART=true
-FOLDER_UPLOAD_MAX_ARCHIVE_MB=10240
+FOLDER_UPLOAD_MAX_ARCHIVE_MB=250
+FOLDER_UPLOAD_MAX_EXPANDED_MB=1000
 FOLDER_UPLOAD_MAX_FILES=500
 ```
 
@@ -71,7 +72,9 @@ Invoke-RestMethod -Method Post `
   -Form @{ file = Get-Item .\my-folder.zip }
 ```
 
-Only `.txt`, `.md`, `.html`, `.pdf`, and `.docx` files are indexed. Indexed memory remains in SQLite/Qdrant after staged upload files are cleaned up.
+Only `.txt`, `.md`, `.html`, `.pdf`, and `.docx` files are indexed. Indexed
+memory remains in the active relational database and Qdrant after staged upload
+files are cleaned up.
 
 ### Desktop telemetry and clipboard
 
@@ -159,14 +162,34 @@ Server:
 
 ```powershell
 cd C:\Dev\lumeward
-.\venv_win\Scripts\python.exe backend\main.py --mode server
+.\venv_win\Scripts\python.exe scripts\dev\database.py status
+.\venv_win\Scripts\python.exe scripts\dev\database.py initialize
+.\venv_win\Scripts\python.exe backend\main.py
 ```
+
+Server mode requires `DATABASE_URL` pointing to PostgreSQL and `QDRANT_URL`
+pointing to a Qdrant service; a service on `127.0.0.1` is supported. It never
+falls back to SQLite or embedded Qdrant. Desktop mode continues to use local
+SQLite and embedded Qdrant data.
+Keep both storage configurations in `.env` and change only `APP_MODE` to switch
+between `DESKTOP` and `SERVER`.
+
+During the pre-release phase, server schema changes use an explicit destructive
+refresh instead of automatic migrations:
+
+```powershell
+.\venv_win\Scripts\python.exe scripts\dev\database.py refresh --confirm lumeward
+.\venv_win\Scripts\python.exe scripts\dev\database.py refresh-all --confirm lumeward
+```
+
+`refresh` deletes PostgreSQL application data. `refresh-all` also deletes and
+recreates Lumeward's Qdrant collections. Neither command runs during startup.
 
 Desktop:
 
 ```powershell
 cd C:\Dev\lumeward
-.\venv_win\Scripts\python.exe backend\main.py --mode desktop
+.\venv_win\Scripts\python.exe backend\main.py
 ```
 
 Interactive server:

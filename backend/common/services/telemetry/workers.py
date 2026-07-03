@@ -12,43 +12,57 @@ from qdrant_client.http import models
 from sqlmodel import Session, select
 
 from backend.common.config import settings
-from backend.common.database import engine
+from backend.common.database import session_scope
 from backend.common.models.sql import DerivedMemory, EventRaw, FilesIndex
-from backend.common.services.telemetry.event_bus import EventBus, EventPriority, TelemetryEvent
+from backend.common.services.telemetry.event_bus import EventBus, TelemetryEvent
 from backend.common.services.telemetry.ingestion import chunk_text, extract_text_from_file, file_sha256
 from backend.common.services.memory.vector_db import client, ensure_collection, get_embedder
+from backend.common.services.memory.point_ids import stable_point_id
 
 logger = logging.getLogger(__name__)
 
 
-class TelemetryDispatcher:
-    def __init__(self, event_bus: EventBus, ingestion_queue: asyncio.Queue, summary_queue: asyncio.Queue) -> None:
-        self.event_bus = event_bus
-        self.ingestion_queue = ingestion_queue
-        self.summary_queue = summary_queue
+class _AsyncQueueWorker:
+    def __init__(self, queue: asyncio.Queue, error_label: str) -> None:
+        self.queue = queue
+        self._error_label = error_label
         self._stop = asyncio.Event()
-        self._writes = 0
 
     async def run(self) -> None:
         while not self._stop.is_set():
-            event = await self.event_bus.queue.get()
+            event = await self.queue.get()
             try:
-                self._persist_event(event)
-                if event.event_type == "file_ingestion":
-                    await self.ingestion_queue.put(event)
-                if event.event_type in {"session_end", "generate_newsletter"}:
-                    await self.summary_queue.put(event)
+                await self._process_event(event)
             except Exception as exc:
-                logger.exception("Telemetry dispatcher error: %s", exc)
+                logger.exception("%s error: %s", self._error_label, exc)
             finally:
-                self.event_bus.queue.task_done()
+                self.queue.task_done()
 
     def stop(self) -> None:
         self._stop.set()
 
+    async def _process_event(self, event: TelemetryEvent) -> None:
+        raise NotImplementedError
+
+
+class TelemetryDispatcher(_AsyncQueueWorker):
+    def __init__(self, event_bus: EventBus, ingestion_queue: asyncio.Queue, summary_queue: asyncio.Queue) -> None:
+        super().__init__(event_bus.queue, "Telemetry dispatcher")
+        self.event_bus = event_bus
+        self.ingestion_queue = ingestion_queue
+        self.summary_queue = summary_queue
+        self._writes = 0
+
+    async def _process_event(self, event: TelemetryEvent) -> None:
+        self._persist_event(event)
+        if event.event_type == "file_ingestion":
+            await self.ingestion_queue.put(event)
+        if event.event_type in {"session_end", "generate_newsletter"}:
+            await self.summary_queue.put(event)
+
     def _persist_event(self, event: TelemetryEvent) -> None:
         content_hash = event.content_hash or _hash_payload(event)
-        with Session(engine) as session:
+        with session_scope() as session:
             if _is_duplicate(session, content_hash):
                 logger.info("Skipping duplicate event: %s", event.event_type)
                 return
@@ -69,23 +83,9 @@ class TelemetryDispatcher:
             _purge_old_events()
 
 
-class DocumentIngestionWorker:
+class DocumentIngestionWorker(_AsyncQueueWorker):
     def __init__(self, queue: asyncio.Queue) -> None:
-        self.queue = queue
-        self._stop = asyncio.Event()
-
-    async def run(self) -> None:
-        while not self._stop.is_set():
-            event = await self.queue.get()
-            try:
-                await self._process_event(event)
-            except Exception as exc:
-                logger.exception("Document ingestion error: %s", exc)
-            finally:
-                self.queue.task_done()
-
-    def stop(self) -> None:
-        self._stop.set()
+        super().__init__(queue, "Document ingestion")
 
     async def _process_event(self, event: TelemetryEvent) -> None:
         path = Path(event.payload.get("path", ""))
@@ -102,7 +102,7 @@ class DocumentIngestionWorker:
         content_hash = file_sha256(path)
         mtime = path.stat().st_mtime
 
-        with Session(engine) as session:
+        with session_scope() as session:
             existing = session.get(FilesIndex, str(path))
             if existing and existing.content_hash == content_hash and existing.mtime == mtime:
                 _update_file_index(path, "skipped", "Unchanged file", content_hash, mtime)
@@ -124,7 +124,7 @@ class DocumentIngestionWorker:
         for idx, vector in enumerate(vectors):
             points.append(
                 models.PointStruct(
-                    id=str(uuid.uuid4()),
+                    id=stable_point_id("document", user_id, content_hash, idx),
                     vector=vector,
                     payload={
                         "document": chunks[idx],
@@ -140,24 +140,10 @@ class DocumentIngestionWorker:
         _update_file_index(path, "ingested", None, content_hash, mtime)
 
 
-class SessionSummaryWorker:
+class SessionSummaryWorker(_AsyncQueueWorker):
     def __init__(self, queue: asyncio.Queue, profile_worker: "UserProfileRollupWorker") -> None:
-        self.queue = queue
+        super().__init__(queue, "Session summary")
         self.profile_worker = profile_worker
-        self._stop = asyncio.Event()
-
-    async def run(self) -> None:
-        while not self._stop.is_set():
-            event = await self.queue.get()
-            try:
-                await self._process_event(event)
-            except Exception as exc:
-                logger.exception("Session summary error: %s", exc)
-            finally:
-                self.queue.task_done()
-
-    def stop(self) -> None:
-        self._stop.set()
 
     async def _process_event(self, event: TelemetryEvent) -> None:
         summary = _build_session_summary(event.session_id)
@@ -167,7 +153,7 @@ class SessionSummaryWorker:
 
         ensure_collection(settings.QDRANT_COLLECTION_SESSION_MEMORY)
         vector = get_embedder().encode(summary).tolist()
-        point_id = str(uuid.uuid4())
+        point_id = stable_point_id("session-summary", user_id, event.session_id)
 
         client.upsert(
             collection_name=settings.QDRANT_COLLECTION_SESSION_MEMORY,
@@ -185,7 +171,7 @@ class SessionSummaryWorker:
             ],
         )
 
-        with Session(engine) as session:
+        with session_scope() as session:
             memory = DerivedMemory(
                 user_id=user_id,
                 memory_type="session_summary",
@@ -209,7 +195,7 @@ class UserProfileRollupWorker:
         if resolved_user_id < 0:
             return
         async with self._lock:
-            with Session(engine) as session:
+            with session_scope() as session:
                 summary_count = session.exec(
                     select(DerivedMemory)
                     .where(
@@ -235,7 +221,7 @@ class UserProfileRollupWorker:
 
             ensure_collection(settings.QDRANT_COLLECTION_USER_PROFILE)
             vector = get_embedder().encode(profile_text).tolist()
-            point_id = str(uuid.uuid4())
+            point_id = stable_point_id("profile-rollup", resolved_user_id, len(profile_count) + 1)
 
             client.upsert(
                 collection_name=settings.QDRANT_COLLECTION_USER_PROFILE,
@@ -252,7 +238,7 @@ class UserProfileRollupWorker:
                 ],
             )
 
-            with Session(engine) as session:
+            with session_scope() as session:
                 memory = DerivedMemory(
                     user_id=resolved_user_id,
                     memory_type="user_profile",
@@ -292,7 +278,7 @@ def _is_duplicate(session: Session, content_hash: str) -> bool:
 
 def _purge_old_events() -> None:
     cutoff = datetime.utcnow() - timedelta(days=settings.RETENTION_DAYS_EVENTS_RAW)
-    with Session(engine) as session:
+    with session_scope() as session:
         events = session.exec(select(EventRaw).where(EventRaw.ts < cutoff)).all()
         for event in events:
             session.delete(event)
@@ -300,7 +286,7 @@ def _purge_old_events() -> None:
 
 
 def _update_file_index(path: Path, status: str, error: str | None, content_hash: str | None = None, mtime: float | None = None) -> None:
-    with Session(engine) as session:
+    with session_scope() as session:
         record = session.get(FilesIndex, str(path))
         if record is None:
             record = FilesIndex(path=str(path), content_hash=content_hash or "", mtime=mtime or 0)
@@ -316,7 +302,7 @@ def _update_file_index(path: Path, status: str, error: str | None, content_hash:
 
 
 def _build_session_summary(session_id: str) -> str:
-    with Session(engine) as session:
+    with session_scope() as session:
         events = session.exec(
             select(EventRaw).where(EventRaw.session_id == session_id).order_by(EventRaw.ts)
         ).all()

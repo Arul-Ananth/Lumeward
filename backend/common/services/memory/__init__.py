@@ -8,6 +8,7 @@ __all__ = [
     "get_embedder",
     "get_memory_context",
     "get_user_context",
+    "QdrantUnavailableError",
     "save_feedback",
 ]
 
@@ -20,6 +21,7 @@ def __getattr__(name: str):
         "get_embedder",
         "get_memory_context",
         "get_user_context",
+        "QdrantUnavailableError",
         "save_feedback",
     }:
         from backend.common.services.memory import vector_db

@@ -6,7 +6,7 @@ import logging
 from PySide6.QtCore import QThread, Signal
 from sqlmodel import Session
 
-from backend.common.database import engine
+from backend.common.database import get_engine
 from backend.common.security.policy import InputSanitizer
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ class AIWorker(QThread):
             from backend.common.services.newsletter.pipeline import newsletter_pipeline
 
             self.status_message.emit("Starting AI generation...")
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 result = asyncio.run(
                     newsletter_pipeline.generate_newsletter(
                         topic=self.topic,

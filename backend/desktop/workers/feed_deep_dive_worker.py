@@ -6,7 +6,7 @@ import logging
 from PySide6.QtCore import QThread, Signal
 from sqlmodel import Session
 
-from backend.common.database import engine
+from backend.common.database import get_engine
 from backend.common.security.policy import InputSanitizer
 from backend.common.services.intelligence_feed.feed_deep_dive import run_deep_dive
 
@@ -34,7 +34,7 @@ class FeedDeepDiveWorker(QThread):
 
     def run(self) -> None:
         try:
-            with Session(engine) as session:
+            with Session(get_engine()) as session:
                 markdown = asyncio.run(
                     run_deep_dive(
                         session,

@@ -88,6 +88,12 @@ def run_checks() -> list[tuple[str, bool]]:
         checks.append(_fail("ENGINE_ENABLED=true but ENGINE_BASE_URL is empty"))
     if settings.APP_MODE == AppMode.SERVER and not settings.is_trusted_lan_auth() and not settings.SECRET_KEY:
         checks.append(_fail("interactive server mode requires SECRET_KEY"))
+    if settings.APP_MODE == AppMode.SERVER:
+        try:
+            settings.validate_storage_configuration()
+            checks.append(_ok("server storage configuration: PostgreSQL and remote Qdrant configured"))
+        except RuntimeError as exc:
+            checks.append(_fail(str(exc)))
     return checks
 
 

@@ -17,7 +17,8 @@
 - `backend/common/config.py`
   - shared settings, mode/auth resolution, desktop data-dir selection
 - `backend/common/database.py`
-  - SQLModel engine/session setup
+  - mode-aware SQLModel engine/session setup, PostgreSQL pooling, desktop
+    compatibility migrations, and server schema-version validation
 - `backend/common/services/`
   - `auth/` web identity/session helpers
   - `newsletter/` active newsletter curation pipeline, templates, compiler, history persistence
@@ -30,18 +31,25 @@
 ### Server mode
 
 - App factory lives in `backend/server/app.py`.
+- PostgreSQL is required through `DATABASE_URL`; schema changes are managed
+  explicitly with `scripts/dev/database.py`.
+- Qdrant is required through `QDRANT_URL`; localhost services are supported.
+- `/health/live` and `/health/ready` expose process and dependency readiness.
 - Web auth supports `trusted_lan` and `interactive` modes.
 - Remote OpenAI-compatible engine support is optional and stays behind the backend.
 - Remote engine mode sends only sanitized model-generation payloads to `ENGINE_BASE_URL`; auth, memory, telemetry, schedules, digest history, and vector storage stay on the Lumeward host.
 - Server mode supports explicit `.zip` folder upload at `POST /news/ingest/folder`.
 - Uploaded archives and extracted files are staged under `DATA_DIR / FOLDER_UPLOAD_DIR`.
 - Staged upload files are deleted only on server startup when `FOLDER_UPLOAD_DELETE_ON_RESTART=true`.
-- The upload archive size limit is environment-configurable with `FOLDER_UPLOAD_MAX_ARCHIVE_MB`; the current default is `10240` MB.
-- Indexed SQLite/Qdrant memory remains after staged upload files are cleaned up.
+- Compressed and expanded upload limits are configured with
+  `FOLDER_UPLOAD_MAX_ARCHIVE_MB` and `FOLDER_UPLOAD_MAX_EXPANDED_MB`; the
+  defaults are 250 MB and 1000 MB.
+- Indexed PostgreSQL/Qdrant state remains after staged upload files are cleaned up.
 
 ### Desktop mode
 
 - Desktop entrypoint lives in `backend/desktop/main.py`.
+- Desktop storage remains SQLite plus embedded Qdrant and ignores server URLs.
 - Desktop startup now applies saved theme preference before showing the main window.
 - The main desktop UI is organized around a `Personal Feed`, a collapsible `Guidance` control, and a `Deep Dive Viewer`.
 - The desktop UI is scrollable at the page level and keeps execution logs collapsed by default.
@@ -103,5 +111,5 @@ These are not commitments unless explicitly scheduled:
 - per-user memory isolation across all web modes
 - richer desktop visual polish beyond the current structure/theme work
 - a dedicated remote job/code-execution engine separated from the LLM provider path
-- deeper response typing and billing/accounting cleanup
+- deeper response typing for profile and API payloads
 - further pruning of legacy compatibility wrappers after import migration finishes

@@ -166,7 +166,7 @@ class NewsletterPipeline:
             )
             session.add(digest)
             session.commit()
-        return NewsResponse(topic=topic, content=markdown, bill={"deducted": 1, "remaining": 99})
+        return NewsResponse(topic=topic, content=markdown)
 
     def _run_generation(
         self,

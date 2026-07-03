@@ -8,7 +8,7 @@
 
 ## Main modules
 
-- `store.py`: identity lookup, user creation, wallet creation, and session token persistence.
+- `store.py`: identity lookup, user creation, and session token persistence.
 - `resolver.py`: route-facing auth resolution.
 - `providers/trusted_lan.py`: trusted-LAN principal creation.
 - `providers/interactive.py`: signup, login, and session-backed request resolution.

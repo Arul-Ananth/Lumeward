@@ -10,7 +10,7 @@ tmp = use_temp_data_dir()
 from sqlmodel import Session, select
 
 from backend.common.config import AppMode, settings
-from backend.common.database import create_db_and_tables, engine
+from backend.common.database import create_db_and_tables, get_engine
 from backend.common.models.sql import NewsletterDigest, NewsletterSchedule, User
 from backend.common.security.policy import InputSanitizer
 from backend.common.services.memory import vector_db
@@ -26,18 +26,19 @@ from backend.desktop.workers.cron_digest import CronDigestWorker
 
 
 async def main() -> int:
-    settings.APP_MODE = AppMode.SERVER
+    settings.APP_MODE = AppMode.DESKTOP
     settings.ENGINE_ENABLED = True
     settings.ENGINE_BASE_URL = "https://trusted-engine.example/v1"
     settings.ENGINE_API_KEY = "test"
     settings.ENGINE_MODEL_NAME = "test-model"
     settings.configure()
     create_db_and_tables()
+    settings.APP_MODE = AppMode.SERVER
 
     original_body = newsletter_pipeline._build_body
     newsletter_pipeline._build_body = lambda *args, **kwargs: "### Mock Digest\n\n- Safe local insight."  # type: ignore[method-assign]
     try:
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             user = User(email="verify@example.com", full_name="Verify User", hashed_password="disabled")
             session.add(user)
             session.commit()

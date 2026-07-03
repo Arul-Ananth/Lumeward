@@ -8,7 +8,7 @@ from datetime import datetime
 
 from sqlmodel import Session
 
-from backend.common.database import engine
+from backend.common.database import get_engine
 from backend.common.services.newsletter.pipeline import due_schedules, mark_schedule_run, newsletter_pipeline
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ class CronDigestWorker:
 
     def run_once(self, now: datetime | None = None) -> int:
         generated = 0
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             schedules = due_schedules(session, now=now)
             for schedule in schedules:
                 try:

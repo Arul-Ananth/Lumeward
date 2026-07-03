@@ -15,6 +15,8 @@ Future items listed here may or may not be implemented.
 
 - CLI runtime overrides in `backend/main.py`
 - centralized mode resolution and runtime override handling
+- PostgreSQL connection pooling and explicit pre-release schema management for server mode
+- external or localhost Qdrant service requirement for server mode
 - optional remote OpenAI-compatible engine support
 - outbound allowlisting for the configured remote engine target
 
@@ -41,7 +43,7 @@ Future items listed here may or may not be implemented.
 - OCR, screen snipping, bridge ingestion, and file-drop context attachment
 - server `.zip` folder upload endpoint for explicit local document indexing
 - restart-based managed upload cleanup controlled through `.env`
-- upload-staged files are separate from persisted SQLite/Qdrant memory
+- upload-staged files are separate from persisted relational/Qdrant state
 
 ### Personal intelligence feed
 
@@ -111,7 +113,7 @@ These items are intentionally non-committal. They are candidates, not promises.
 
 - a dedicated remote execution/job engine separated from the LLM provider path
 - more explicit engine health/status visibility in the operator UI
-- deeper typing of billing, profile, and response payloads
+- deeper typing of profile and response payloads
 - continued removal of transitional wrapper modules after import migration finishes
 
 ## How To Read This File

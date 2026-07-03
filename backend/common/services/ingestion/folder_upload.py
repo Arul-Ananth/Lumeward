@@ -15,6 +15,7 @@ from sqlmodel import Session
 from backend.common.config import settings
 from backend.common.models.sql import EventRaw, FilesIndex
 from backend.common.services.memory.vector_db import client, ensure_collection, get_embedder
+from backend.common.services.memory.point_ids import stable_point_id
 from backend.common.services.telemetry.ingestion import chunk_text, extract_text_from_file, file_sha256
 
 ALLOWED_EXTENSIONS = {".txt", ".md", ".html", ".pdf", ".docx"}
@@ -61,7 +62,7 @@ def upload_root() -> Path:
 def ingest_folder_zip(
     session: Session,
     *,
-    archive_bytes: bytes,
+    archive_path: Path,
     filename: str,
     user_id: int,
     session_id: str = "server-upload",
@@ -72,7 +73,7 @@ def ingest_folder_zip(
         raise ValueError("Folder upload requires a .zip archive.")
 
     max_archive_bytes = settings.FOLDER_UPLOAD_MAX_ARCHIVE_MB * 1024 * 1024
-    if len(archive_bytes) > max_archive_bytes:
+    if archive_path.stat().st_size > max_archive_bytes:
         raise ValueError(f"Archive exceeds {settings.FOLDER_UPLOAD_MAX_ARCHIVE_MB} MB.")
 
     batch_id = uuid.uuid4().hex
@@ -82,14 +83,27 @@ def ingest_folder_zip(
     extract_dir.mkdir(parents=True, exist_ok=True)
     _assert_inside(batch_dir, upload_root())
 
-    archive_path = batch_dir / _safe_archive_name(filename)
-    archive_path.write_bytes(archive_bytes)
+    staged_archive_path = batch_dir / _safe_archive_name(filename)
+    shutil.move(str(archive_path), staged_archive_path)
 
-    with zipfile.ZipFile(archive_path) as archive:
-        members = [member for member in archive.infolist() if not member.is_dir()]
-        if len(members) > settings.FOLDER_UPLOAD_MAX_FILES:
-            raise ValueError(f"Archive contains more than {settings.FOLDER_UPLOAD_MAX_FILES} files.")
-        extracted_paths = _extract_members(archive, members, extract_dir)
+    try:
+        with zipfile.ZipFile(staged_archive_path) as archive:
+            members = [member for member in archive.infolist() if not member.is_dir()]
+            if len(members) > settings.FOLDER_UPLOAD_MAX_FILES:
+                raise ValueError(f"Archive contains more than {settings.FOLDER_UPLOAD_MAX_FILES} files.")
+            expanded_bytes = sum(member.file_size for member in members)
+            max_expanded_bytes = settings.FOLDER_UPLOAD_MAX_EXPANDED_MB * 1024 * 1024
+            if expanded_bytes > max_expanded_bytes:
+                raise ValueError(
+                    f"Archive expands beyond {settings.FOLDER_UPLOAD_MAX_EXPANDED_MB} MB."
+                )
+            extracted_paths = _extract_members(archive, members, extract_dir)
+    except zipfile.BadZipFile as exc:
+        shutil.rmtree(batch_dir, ignore_errors=True)
+        raise ValueError("Uploaded file is not a valid ZIP archive.") from exc
+    except ValueError:
+        shutil.rmtree(batch_dir, ignore_errors=True)
+        raise
 
     seen = len(extracted_paths)
     ingested = 0
@@ -175,7 +189,7 @@ def _ingest_file(session: Session, *, path: Path, user_id: int, session_id: str,
         vectors = get_embedder().encode(chunks).tolist()
         points = [
             models.PointStruct(
-                id=str(uuid.uuid4()),
+                id=stable_point_id("document", user_id, content_hash, index),
                 vector=vectors[index],
                 payload={
                     "document": chunk,

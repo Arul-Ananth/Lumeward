@@ -35,22 +35,14 @@ class SignupResponse(StrictBaseModel):
     auth_provider: str
 
 
-class BillingReceipt(StrictBaseModel):
-    deducted: int
-    remaining: int | str
-
-
 class NewsRequest(StrictBaseModel):
     topic: str = Field(min_length=1, max_length=255)
-    serper_api_key: str | None = None
-    openai_api_key: str | None = None
     template_key: str | None = Field(default=None, min_length=1, max_length=80)
 
 
 class NewsResponse(StrictBaseModel):
     topic: str
     content: str
-    bill: BillingReceipt
 
 
 class FeedbackRequest(StrictBaseModel):

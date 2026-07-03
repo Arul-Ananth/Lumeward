@@ -26,45 +26,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [status, setStatus] = useState<AuthStatusResponse | null>(null);
 
-    const refreshStatus = useCallback(async () => {
+    const loadStatus = useCallback(async () => {
         try {
             const nextStatus = await getAuthStatus();
             if (!nextStatus.authenticated && getSessionToken()) {
                 clearSessionToken();
             }
-            setStatus(nextStatus);
+            return nextStatus;
         } catch (error) {
             clearSessionToken();
-            setStatus(normalizeAuthBootstrapError(error));
+            return normalizeAuthBootstrapError(error);
         }
     }, []);
+
+    const refreshStatus = useCallback(async () => {
+        setStatus(await loadStatus());
+    }, [loadStatus]);
 
     useEffect(() => {
         let active = true;
         (async () => {
-            try {
-                const nextStatus = await getAuthStatus();
-                if (!nextStatus.authenticated && getSessionToken()) {
-                    clearSessionToken();
-                }
-                if (active) {
-                    setStatus(nextStatus);
-                }
-            } catch (error) {
-                clearSessionToken();
-                if (active) {
-                    setStatus(normalizeAuthBootstrapError(error));
-                }
-            } finally {
-                if (active) {
-                    setLoading(false);
-                }
+            const nextStatus = await loadStatus();
+            if (active) {
+                setStatus(nextStatus);
+                setLoading(false);
             }
         })();
         return () => {
             active = false;
         };
-    }, []);
+    }, [loadStatus]);
 
     const login = useCallback(async (email: string, password: string) => {
         const nextStatus = await loginRequest(email, password);
@@ -73,10 +64,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
             clearSessionToken();
         }
-        const refreshed = await getAuthStatus();
+        const refreshed = await loadStatus();
         setStatus(refreshed);
         return refreshed;
-    }, []);
+    }, [loadStatus]);
 
     const signup = useCallback(async (fullName: string, email: string, password: string): Promise<SignupResponse> => {
         return signupRequest(fullName, email, password);
@@ -87,14 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await logoutRequest();
         } finally {
             clearSessionToken();
-            try {
-                const nextStatus = await getAuthStatus();
-                setStatus(nextStatus);
-            } catch (error) {
-                setStatus(normalizeAuthBootstrapError(error));
-            }
+            setStatus(await loadStatus());
         }
-    }, []);
+    }, [loadStatus]);
 
     const value = useMemo<AuthContextValue>(
         () => ({

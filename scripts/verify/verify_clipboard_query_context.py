@@ -8,7 +8,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from sqlmodel import Session, select
 
-from backend.common.database import engine
+from backend.common.database import get_engine
 from backend.common.models.sql import EventRaw
 from backend.common.services.memory.vector_db import get_recent_clipboard_context
 from backend.common.services.telemetry.event_bus import EventPriority, TelemetryEvent
@@ -41,7 +41,7 @@ def main() -> int:
         source=event.source,
     )
 
-    with Session(engine) as session:
+    with Session(get_engine()) as session:
         session.add(raw)
         session.commit()
 
@@ -54,7 +54,7 @@ def main() -> int:
         print('PASS: clipboard query resolved recent clipboard text directly.')
         return 0
     finally:
-        with Session(engine) as session:
+        with Session(get_engine()) as session:
             rows = session.exec(select(EventRaw).where(EventRaw.session_id == session_id)).all()
             for row in rows:
                 session.delete(row)
