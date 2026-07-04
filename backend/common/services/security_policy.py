@@ -3,6 +3,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import logging
+import socket
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
@@ -15,7 +16,6 @@ ALLOWED_NETWORK_ACTIONS = {
     "engine.request",
     "search.serper",
     "search.discovery",
-    "search.fetch",
 }
 
 
@@ -45,6 +45,17 @@ def _is_configured_engine_target(target: str) -> bool:
     return engine_origin is not None and engine_origin == target_origin
 
 
+def _is_denied_address(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
+    return not address.is_global
+
+
+def _resolve_addresses(host: str, port: int) -> set[ipaddress.IPv4Address | ipaddress.IPv6Address]:
+    addresses: set[ipaddress.IPv4Address | ipaddress.IPv6Address] = set()
+    for result in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM):
+        addresses.add(ipaddress.ip_address(result[4][0]))
+    return addresses
+
+
 def authorize_network_action(action: str, target: str) -> PolicyDecision:
     if action not in ALLOWED_NETWORK_ACTIONS:
         return PolicyDecision(False, "action_not_allowed", action, target)
@@ -56,6 +67,10 @@ def authorize_network_action(action: str, target: str) -> PolicyDecision:
     host = parsed.hostname
     if not host:
         return PolicyDecision(False, "missing_host", action, target)
+    try:
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    except ValueError:
+        return PolicyDecision(False, "invalid_port", action, target)
 
     if action.startswith("engine."):
         if _is_configured_engine_target(target):
@@ -63,15 +78,25 @@ def authorize_network_action(action: str, target: str) -> PolicyDecision:
         return PolicyDecision(False, "engine_target_not_allowlisted", action, target)
 
     try:
-        ip = ipaddress.ip_address(host)
+        literal_address = ipaddress.ip_address(host)
     except ValueError:
-        ip = None
+        literal_address = None
 
-    if ip is not None and (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved):
+    if literal_address is not None and _is_denied_address(literal_address):
         return PolicyDecision(False, "private_address_denied", action, target)
 
-    if host in {"localhost"}:
+    if host.rstrip(".").lower() == "localhost":
         return PolicyDecision(False, "localhost_denied", action, target)
+
+    if literal_address is None:
+        try:
+            addresses = _resolve_addresses(host, port)
+        except (OSError, ValueError):
+            return PolicyDecision(False, "host_resolution_failed", action, target)
+        if not addresses:
+            return PolicyDecision(False, "host_resolution_failed", action, target)
+        if any(_is_denied_address(address) for address in addresses):
+            return PolicyDecision(False, "private_address_denied", action, target)
 
     return PolicyDecision(True, "allowed", action, target)
 

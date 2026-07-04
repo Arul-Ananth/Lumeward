@@ -26,7 +26,7 @@
 ## Import Rules
 
 - Prefer domain imports, for example:
-  - `from backend.common.services.llm.newsletter_service import newsletter_service`
+  - `from backend.common.services.newsletter.pipeline import newsletter_pipeline`
   - `from backend.common.services.memory.vector_db import get_memory_context`
 - Avoid introducing new imports from legacy wrapper modules unless required for compatibility.
 

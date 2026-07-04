@@ -30,11 +30,7 @@ Checks run during cleanup:
 - Evidence: `backend/common/services/search/web_search.py` subclasses the generic search tool without distinct Google API behavior.
 - Impact: the tool name can imply a different provider than the implementation actually uses.
 
-2. Some compatibility modules remain intentionally
-- Evidence: `backend/server/dependencies.py` and `backend/common/services/llm/crew_agent.py` are retained as compatibility shims.
-- Impact: they are low-cost, but should not be used for new code.
-
-3. Runtime storage is mode-specific
+2. Runtime storage is mode-specific
 - Evidence: desktop mode uses ignored local SQLite/embedded-Qdrant data; server
   mode requires PostgreSQL and a configured Qdrant service.
 - Impact: desktop data remains local, while server deployments must provision

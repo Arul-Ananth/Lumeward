@@ -1,10 +1,11 @@
+from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class StrictBaseModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, from_attributes=True)
 
 
 class UserSignup(StrictBaseModel):
@@ -94,7 +95,7 @@ class NewsletterDigestResponse(StrictBaseModel):
     markdown: str
     html: str
     archived: bool
-    created_at: str
+    created_at: datetime
 
 
 class NewsletterScheduleCreate(StrictBaseModel):
@@ -126,9 +127,9 @@ class NewsletterScheduleResponse(StrictBaseModel):
     local_time: str
     timezone: str
     enabled: bool
-    last_run_at: str | None = None
-    created_at: str
-    updated_at: str
+    last_run_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class FeedCardResponse(StrictBaseModel):
@@ -139,7 +140,7 @@ class FeedCardResponse(StrictBaseModel):
     source_type: str
     priority_score: float
     interest_score: float
-    created_at: str
+    created_at: datetime
     status: str
 
 

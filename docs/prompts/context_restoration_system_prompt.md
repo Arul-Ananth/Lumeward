@@ -197,7 +197,6 @@ Supporting modules:
 - `backend/common/services/llm/provider_factory.py`
 - `backend/common/services/llm/tool_policy.py`
 - `backend/common/services/llm/crew_builder.py`
-- `backend/common/services/llm/newsletter_service.py` (compatibility wrapper)
 
 Current behavior:
 
@@ -312,7 +311,6 @@ Scripts:
 - Verification scripts: `scripts/verify/`
 - Manual scripts: `scripts/manual/`
 - Dev/ops scripts: `scripts/dev/windows/`
-- Sample ingestion fixtures: `scripts/fixtures/ingestion/`
 
 ## 13. Important Environment Variables
 

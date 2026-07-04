@@ -1,4 +1,6 @@
 from _bootstrap import setup_project_path
+import socket
+from unittest.mock import patch
 
 setup_project_path()
 
@@ -49,10 +51,26 @@ def main() -> int:
         if "Web search unavailable" not in result:
             raise AssertionError(f"disabled branch did not report unavailability: {result}")
 
-        allowed = authorize_network_action("search.serper", SERPER_URL)
-        blocked = authorize_network_action("search.fetch", "http://127.0.0.1:8789/private")
+        public_dns_result = [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443)),
+        ]
+        private_dns_result = [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 80)),
+        ]
+        mixed_dns_result = public_dns_result + private_dns_result
+        with patch("backend.common.services.security_policy.socket.getaddrinfo", return_value=public_dns_result):
+            allowed = authorize_network_action("search.serper", SERPER_URL)
+        with patch("backend.common.services.security_policy.socket.getaddrinfo", return_value=private_dns_result):
+            dns_blocked = authorize_network_action("search.discovery", "http://attacker.example/private")
+        with patch("backend.common.services.security_policy.socket.getaddrinfo", return_value=mixed_dns_result):
+            mixed_dns_blocked = authorize_network_action("search.discovery", "http://mixed.example/private")
+        blocked = authorize_network_action("search.discovery", "http://127.0.0.1:8789/private")
+        fetch_blocked = authorize_network_action("search.fetch", "https://example.com/")
         _assert_equal(allowed.allowed, True, "serper policy allowed")
         _assert_equal(blocked.allowed, False, "private search fetch blocked")
+        _assert_equal(dns_blocked.allowed, False, "private DNS result blocked")
+        _assert_equal(mixed_dns_blocked.allowed, False, "mixed public/private DNS results blocked")
+        _assert_equal(fetch_blocked.reason, "action_not_allowed", "arbitrary page fetch disabled")
 
         print("PASS: web search mode resolution, branch selection, and policy checks verified.")
         return 0

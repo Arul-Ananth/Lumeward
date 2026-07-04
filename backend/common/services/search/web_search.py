@@ -72,7 +72,6 @@ class WebSearchTool(BaseTool):
 
     def _duckduckgo_scrape(self, query: str) -> str:
         try:
-            import trafilatura
             DDGS, backend_options = _load_fallback_search_client()
         except Exception as exc:
             return f"Fallback search unavailable: {exc}"
@@ -109,38 +108,11 @@ class WebSearchTool(BaseTool):
         except Exception as exc:
             return f"Error executing fallback search: {exc}"
 
-        urls = [item.get("href") for item in results if item.get("href")]
-        if not urls:
-            return "No results."
-
-        texts = []
-        for url in urls[:3]:
-            text = self._fetch_and_extract(url, trafilatura, query)
-            if text:
-                texts.append(text[:4000])
-
-        if not texts:
-            snippets = [
-                f"- {item.get('title', '')}: {item.get('body') or item.get('snippet', '')}"
-                for item in results[:3]
-            ]
-            return "\n".join(line for line in snippets if line.strip(" -:"))
-        return "\n\n".join(texts)
-
-    def _fetch_and_extract(self, url: str, trafilatura_module, query: str) -> str:
-        decision = authorize_network_action("search.fetch", url)
-        audit_policy_decision(decision=decision, tool_name=self.name, query=query)
-        if not decision.allowed:
-            return ""
-
-        try:
-            response = self._http.get(url, timeout=(5, 15), headers=build_request_headers())
-            response.raise_for_status()
-        except Exception:
-            return ""
-
-        extracted = trafilatura_module.extract(response.text)
-        return extracted or ""
+        snippets = [
+            f"- {item.get('title', '')}: {item.get('body') or item.get('snippet', '')}"
+            for item in results[:3]
+        ]
+        return "\n".join(line for line in snippets if line.strip(" -:")) or "No results."
 
 
 class WebSearchGoogleTool(WebSearchTool):

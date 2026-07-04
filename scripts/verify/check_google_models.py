@@ -11,28 +11,29 @@ if not api_key:
     print("Please set GOOGLE_API_KEY or GEMINI_API_KEY in your .env file.")
     raise SystemExit(1)
 
-print(f"Using API Key: {api_key[:5]}...{api_key[-5:]}")
 print("Connecting to Google Gemini API...")
 
-url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+url = "https://generativelanguage.googleapis.com/v1beta/models"
 
 try:
-    response = requests.get(url, timeout=10)
+    response = requests.get(url, headers={"x-goog-api-key": api_key}, timeout=10)
     if response.status_code == 200:
         data = response.json()
         print("\nSUCCESS! Connection established.\n")
         print("Available Models:")
         print("-" * 40)
         found_flash = False
+        flash_models = []
         for model in data.get("models", []):
             if "flash" in model.get("name", ""):
                 print(f"- {model['name']}")
                 found_flash = True
+                flash_models.append(model["name"].removeprefix("models/"))
         print("-" * 40)
 
         if found_flash:
-            print("\nRECOMMENDATION FOR .ENV:")
-            print("OPENAI_MODEL_NAME=gemini-1.5-flash")
+            print("\nChoose an available model appropriate for your deployment.")
+            print(f"Example: OPENAI_MODEL_NAME={flash_models[0]}")
         else:
             print("\nWARNING: No 'flash' model found. Check your API key permissions.")
     else:

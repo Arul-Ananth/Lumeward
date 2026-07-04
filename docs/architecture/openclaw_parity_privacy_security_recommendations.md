@@ -35,7 +35,7 @@ Status: archived reference. This document is not the active Lumeward architectur
 ### 1.4 Search tooling
 - Web search tool (`backend/common/services/search/web_search.py`):
   - Primary: Serper search endpoint.
-  - Desktop fallback: DDG + trafilatura extraction.
+  - Desktop fallback: DDG result snippets without fetching search-controlled pages.
   - Registered tool names: `Web Search`, `Web Search (Google)` (currently shared behavior class).
 
 ### 1.5 Memory and vector layer

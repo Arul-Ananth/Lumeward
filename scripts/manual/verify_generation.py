@@ -7,7 +7,7 @@ if str(root) not in sys.path:
     sys.path.append(str(root))
 
 from backend.common.config import AppMode, settings
-from backend.common.services.llm.newsletter_service import newsletter_service
+from backend.common.services.newsletter.pipeline import newsletter_pipeline
 
 
 async def main() -> None:
@@ -21,7 +21,7 @@ async def main() -> None:
 
     try:
         print("Sending request to LLM (this may take time)...")
-        result = await newsletter_service.generate_newsletter("Physics", user_id=1)
+        result = await newsletter_pipeline.generate_newsletter(topic="Physics", user_id=1)
         print("\n--- Result Content ---")
         print(result.content[:500] + "...")
         print("--- End Result ---")

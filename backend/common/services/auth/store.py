@@ -102,18 +102,26 @@ def create_user_with_password_identity(
         full_name=full_name.strip(),
         hashed_password=password_hash,
     )
-    session.add(user)
-    session.commit()
-    session.refresh(user)
-
-    identity = ensure_identity(
-        session,
-        user=user,
+    identity = AuthIdentity(
+        user_id=0,
         provider=INTERACTIVE_PROVIDER,
         subject=normalized_email,
         email=normalized_email,
         password_hash=password_hash,
     )
+    try:
+        session.add(user)
+        session.flush()
+        if user.id is None:
+            raise RuntimeError("Database did not assign a user ID.")
+        identity.user_id = user.id
+        session.add(identity)
+        session.commit()
+        session.refresh(user)
+        session.refresh(identity)
+    except Exception:
+        session.rollback()
+        raise
     return user, identity
 
 

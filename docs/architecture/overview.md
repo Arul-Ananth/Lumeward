@@ -72,7 +72,6 @@
 - `backend/common/services/newsletter/pipeline.py` is the active orchestration entry point.
 - `templates.py` owns built-in newsletter templates.
 - `compiler.py` converts generated content into Markdown and minimal safe HTML.
-- `backend/common/services/llm/newsletter_service.py` is a compatibility wrapper only.
 - SQLModel persistence covers templates, generated digests, and schedules.
 - `/news/generate` remains compatible with the frontend and persists generated digests.
 - `/news/history`, `/news/templates`, `/news/schedules`, `/news/feed`, and `/news/ingest/folder` expose the current server surface.

@@ -87,31 +87,12 @@ async def generate_news(
 
 @router.get("/templates", response_model=list[NewsletterTemplateResponse])
 def get_templates(session: DbSession):
-    return [
-        NewsletterTemplateResponse(
-            key=template.key,
-            name=template.name,
-            description=template.description,
-            cadence=template.cadence,
-            prompt_hint=template.prompt_hint,
-        )
-        for template in list_templates(session)
-    ]
+    return list_templates(session)
 
 
 @router.get("/sources", response_model=list[NewsletterSourceCapabilityResponse])
 def get_sources():
-    return [
-        NewsletterSourceCapabilityResponse(
-            key=source.key,
-            display_name=source.display_name,
-            status=source.status,
-            supported_platforms=source.supported_platforms,
-            required_permissions=source.required_permissions,
-            implemented=source.implemented,
-        )
-        for source in list_source_capabilities()
-    ]
+    return list_source_capabilities()
 
 
 @router.get("/feed", response_model=list[FeedCardResponse])
@@ -120,7 +101,7 @@ def get_feed(
     session: DbSession,
 ):
     feed_router.process_new_events(session, principal.user_id)
-    return [_feed_card_response(card) for card in feed_router.list_cards(session, principal.user_id)]
+    return feed_router.list_cards(session, principal.user_id)
 
 
 @router.post("/feed/{feed_id}/dismiss", response_model=FeedCardResponse)
@@ -132,7 +113,7 @@ def dismiss_feed_card(
     card = feed_router.dismiss(session, principal.user_id, feed_id)
     if card is None:
         raise HTTPException(status_code=404, detail="Feed card not found")
-    return _feed_card_response(card)
+    return card
 
 
 @router.post("/feed/{feed_id}/deep-dive", response_model=NewsResponse)
@@ -173,15 +154,7 @@ async def ingest_folder_upload(
     except Exception as exc:
         logger.exception("Folder upload ingestion failed: %s", exc)
         raise HTTPException(status_code=500, detail="Folder upload ingestion failed.") from exc
-    return FolderIngestResponse(
-        status=result.status,
-        batch_id=result.batch_id,
-        files_seen=result.files_seen,
-        files_ingested=result.files_ingested,
-        files_skipped=result.files_skipped,
-        files_failed=result.files_failed,
-        message=result.message,
-    )
+    return result
 
 
 class UploadTooLargeError(ValueError):
@@ -257,7 +230,7 @@ def get_history(
     session: DbSession,
     include_archived: bool = False,
 ):
-    return [_digest_response(digest) for digest in list_digests(session, principal.user_id, include_archived=include_archived)]
+    return list_digests(session, principal.user_id, include_archived=include_archived)
 
 
 @router.get("/history/{digest_id}", response_model=NewsletterDigestResponse)
@@ -269,7 +242,7 @@ def read_digest(
     digest = get_digest(session, principal.user_id, digest_id)
     if digest is None:
         raise HTTPException(status_code=404, detail="Digest not found")
-    return _digest_response(digest)
+    return digest
 
 
 @router.post("/history/{digest_id}/archive", response_model=NewsletterDigestResponse)
@@ -281,7 +254,7 @@ def archive_history_digest(
     digest = archive_digest(session, principal.user_id, digest_id)
     if digest is None:
         raise HTTPException(status_code=404, detail="Digest not found")
-    return _digest_response(digest)
+    return digest
 
 
 @router.get("/schedules", response_model=list[NewsletterScheduleResponse])
@@ -289,7 +262,7 @@ def get_schedules(
     principal: CurrentPrincipal,
     session: DbSession,
 ):
-    return [_schedule_response(schedule) for schedule in list_schedules(session, principal.user_id)]
+    return list_schedules(session, principal.user_id)
 
 
 @router.post("/schedules", status_code=201, response_model=NewsletterScheduleResponse)
@@ -314,7 +287,7 @@ def create_schedule(
     session.add(schedule)
     session.commit()
     session.refresh(schedule)
-    return _schedule_response(schedule)
+    return schedule
 
 
 @router.patch("/schedules/{schedule_id}", response_model=NewsletterScheduleResponse)
@@ -338,7 +311,7 @@ def update_schedule(
     session.add(schedule)
     session.commit()
     session.refresh(schedule)
-    return _schedule_response(schedule)
+    return schedule
 
 
 @router.delete("/schedules/{schedule_id}", response_model=MessageResponse)
@@ -388,49 +361,6 @@ def get_profile(
     effective_user_id = principal.user_id if settings.is_trusted_lan_auth() else user_id
     memories = vector_db.fetch_memories(effective_user_id)
     return ProfileResponse(memories=memories)
-
-
-def _digest_response(digest) -> NewsletterDigestResponse:
-    return NewsletterDigestResponse(
-        id=digest.id,
-        template_key=digest.template_key,
-        title=digest.title,
-        topic=digest.topic,
-        markdown=digest.markdown,
-        html=digest.html,
-        archived=digest.archived,
-        created_at=digest.created_at.isoformat(),
-    )
-
-
-def _schedule_response(schedule: NewsletterSchedule) -> NewsletterScheduleResponse:
-    return NewsletterScheduleResponse(
-        id=schedule.id,
-        name=schedule.name,
-        template_key=schedule.template_key,
-        topic_seed=schedule.topic_seed,
-        cadence=schedule.cadence,
-        local_time=schedule.local_time,
-        timezone=schedule.timezone,
-        enabled=schedule.enabled,
-        last_run_at=schedule.last_run_at.isoformat() if schedule.last_run_at else None,
-        created_at=schedule.created_at.isoformat(),
-        updated_at=schedule.updated_at.isoformat(),
-    )
-
-
-def _feed_card_response(card) -> FeedCardResponse:
-    return FeedCardResponse(
-        id=card.id,
-        title=card.title,
-        bullets=card.bullets,
-        topics=card.topics,
-        source_type=card.source_type,
-        priority_score=card.priority_score,
-        interest_score=card.interest_score,
-        created_at=card.created_at.isoformat(),
-        status=card.status,
-    )
 
 
 def _get_user_schedule(session: Session, user_id: int, schedule_id: int) -> NewsletterSchedule | None:
