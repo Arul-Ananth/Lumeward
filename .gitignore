@@ -1,151 +1,129 @@
-qdrant_db_local/
-miscellanious/
-PLANS/
-backend/lumeward_server.db
-venv_linux/
-.venv_linux/
+# ===========================
+# Local environment
+# ===========================
+.env
+.env.*
+!.env.example
+!.env.*.example
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+!frontend/.env.*.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+!backend/.env.*.example
+
+# Python virtual environments
+.venv/
+.venv_*/
+venv/
+venv_*/
+backend/.venv/
+backend/.venv_*/
+backend/venv/
+backend/venv_*/
 
 # ===========================
-# React / Node (lumeward-ui)
+# Python generated files
+# ===========================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# ===========================
+# React / Vite / Node
 # ===========================
 node_modules/
 frontend/node_modules/
+.vite/
 frontend/.vite/
-frontend/build/
 frontend/dist/
+frontend/build/
 frontend/out/
-frontend/.env
-frontend/.env.local
-frontend/.env.*.local
-
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-package-lock.json
-!frontend/package-lock.json
 
 # ===========================
-# FASTAPI / Python Backend
+# Build and packaging output
 # ===========================
-backend/.venv/
-backend/venv/
-backend/venv_win/
-.venv/
-venv_win/
-venv/
-venv_linux/
-.venv_linux/
-backend/__pycache__/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.spec
-!packaging/pyinstaller/*.spec
-*.egg-info/
-
-backend/build/
-backend/dist/
 build/
 dist/
 out/
-
-# Environment files
-backend/.env
-.env
-
-# ===========================
-# CrewAI / Vector DB Files
-# ===========================
-backend/chroma_db_local/
-backend/qdrant_db_local/
-src-tauri/qdrant_db_local/
-qdrant_data/
-newsroom.db
-*.db
-data/
-
-crew_cache/
-crewai_cache/
-
-# ===========================
-# Tauri (Rust) Files
-# ===========================
-# Rust build artifacts
-target/
-src-tauri/target/
-src-tauri/.cargo/
-src-tauri/.rustup/
-
-# Tauri build output
-src-tauri/gen/
-src-tauri/icons/*
-!src-tauri/icons/icon.png  # allow the main icon if needed
-
-# Tauri build outputs
-src-tauri/target/
-src-tauri/binaries/
+backend/build/
+backend/dist/
+packaging/build/
+packaging/dist/
 *.exe
 *.msi
 *.app
+*.dmg
+*.pkg
+*.deb
+*.snap
 
-
-# Bundled application outputs
+# Tauri / desktop bundling artifacts
+target/
 src-tauri/target/
-src-tauri/completions/
-src-tauri/*.deb
-src-tauri/*.app
-src-tauri/*.dmg
-src-tauri/*.msi
-src-tauri/*.exe
-src-tauri/*.pkg
-src-tauri/*.snap
+src-tauri/gen/
+src-tauri/binaries/
 src-tauri/bundles/
-
-# Environment files
-src-tauri/.env
-src-tauri/.env.local
-src-tauri/.env.*.local
-
-# Tauri logs
+src-tauri/completions/
+src-tauri/.cargo/
+src-tauri/.rustup/
 tauri-debug.log
 tauri-error.log
 
 # ===========================
-# Logs (generic)
+# Runtime data and local databases
+# ===========================
+data/
+.runtime_verify/
+qdrant_db_local/
+qdrant_data/
+backend/lumeward_server.db
+backend/chroma_db_local/
+backend/qdrant_db_local/
+src-tauri/qdrant_db_local/
+crew_cache/
+crewai_cache/
+
+# ===========================
+# Logs and temporary files
 # ===========================
 *.log
 logs/
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*~
 
 # ===========================
-# IDE / Editor
+# IDE / editor
 # ===========================
-# VSCode
 .vscode/
-
-# JetBrains
 .idea/
 
 # ===========================
-# OS Files
+# OS files
 # ===========================
-# Windows
 Thumbs.db
 Desktop.ini
-
-# macOS
 .DS_Store
 .AppleDouble
 .LSOverride
-
-# Linux temp files
-*~
-
-# Coverage / caches
-.coverage
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-htmlcov/
 

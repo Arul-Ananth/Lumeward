@@ -121,6 +121,37 @@ files are cleaned up.
 - `scripts/dev/` build and operational scripts
 - `packaging/pyinstaller/` desktop packaging specs
 
+## Dependency Locking
+
+Python dependencies use human-edited `.in` files and generated `.lock.txt`
+files. Use the lock files for reproducible installs:
+
+```powershell
+.\venv_win\Scripts\python.exe -m pip install uv
+.\venv_win\Scripts\python.exe -m uv pip sync --torch-backend cpu requirements-server.lock.txt
+```
+
+Edit the matching `.in` file when changing direct dependencies, then regenerate
+the lock:
+
+```powershell
+.\venv_win\Scripts\python.exe -m uv pip compile --universal --no-strip-markers --torch-backend cpu requirements-server.in -o requirements-server.lock.txt
+```
+
+The `.in` files are the human-edited dependency inputs. Production, server,
+desktop, and packaging installs must use the matching generated lock file.
+
+## Testing
+
+Backend tests use pytest and default to local deterministic checks:
+
+```powershell
+.\venv_win\Scripts\python.exe -m pytest tests
+```
+
+Use `scripts/verify/` for targeted smoke checks that have not yet been converted
+to pytest or that need live integrations.
+
 ## Beta Packaging
 
 Lumeward Beta 1.0 desktop packaging uses the tracked PyInstaller spec as the build source of truth:
@@ -151,7 +182,8 @@ Run preflight before packaging:
 Install packaging dependencies before building executables:
 
 ```powershell
-.\venv_win\Scripts\python.exe -m pip install -r requirements-packaging.txt
+.\venv_win\Scripts\python.exe -m pip install uv
+.\venv_win\Scripts\python.exe -m uv pip sync --torch-backend cpu requirements-packaging.lock.txt
 ```
 
 Beta 1.0 includes a metadata-only `/news/sources` endpoint for planned future source integrations. It does not load plugins, store plugin credentials, or ingest Telegram/WhatsApp/RSS/email data.
@@ -214,14 +246,14 @@ Those items are directional only unless explicitly scheduled; they are not commi
 
 ## Linux Desktop Setup
 
-For Linux or WSL desktop testing, use the Linux-specific desktop requirements file:
+For Linux or WSL desktop testing, use the Linux-specific desktop lock file:
 
 ```bash
 cd /mnt/c/Dev/lumeward
 python3 -m venv .venv_linux
 source .venv_linux/bin/activate
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install -r requirements-desktop-linux.txt
+python -m pip install --upgrade pip setuptools wheel uv
+python -m uv pip sync --torch-backend cpu requirements-desktop-linux.lock.txt
 python backend/main.py --mode desktop
 ```
 
@@ -233,8 +265,8 @@ sudo apt install -y python3-venv libgl1 libglib2.0-0 libxkbcommon-x11-0 libdbus-
 ```
 
 Notes:
-- `requirements.txt` includes the CrewAI Google provider extra used by `LLM_PROVIDER=google`.
-- `requirements-desktop-linux.txt` installs Linux keyring backends so desktop secret access works more reliably for other developers.
+- `requirements.in` includes the CrewAI Google provider extra used by `LLM_PROVIDER=google`.
+- `requirements-desktop-linux.lock.txt` installs Linux keyring backends so desktop secret access works more reliably for other developers.
 - In WSL, a working GUI environment is still required for PySide6 desktop mode.
 
 ## macOS Desktop Notes

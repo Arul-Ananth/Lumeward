@@ -1,0 +1,25 @@
+crewai[google-genai]==1.15.2
+pydantic==2.12.5
+pydantic-settings==2.10.1
+email-validator
+litellm==1.92.0
+requests
+passlib
+argon2-cffi
+sqlmodel==0.0.39
+qdrant-client
+sentence-transformers
+
+fastapi==0.139.0
+uvicorn==0.51.0
+python-multipart==0.0.32
+
+# Deferred major migrations.
+google-genai<2
+cryptography<49
+protobuf<7
+opencv-python-headless<5
+
+# Test runner
+pytest
+pytest-asyncio

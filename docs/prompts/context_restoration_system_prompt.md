@@ -401,7 +401,9 @@ Note:
 - `untrusted` is documentation terminology; the runtime auth enum is still `interactive`.
 - `Web Search (Google)` is currently a renamed subclass, not a distinct Google API implementation.
 - Some telemetry code still uses deprecated `datetime.utcnow()` and should be cleaned up later.
-- Heavy embedding initialization still exists in memory/vector paths.
+- The embedding model is lazily imported and initialized on first use. The
+  public `sentence-transformers/all-MiniLM-L6-v2` weights come from Hugging Face
+  and are cached locally; `HF_TOKEN` is optional.
 - Some old docs may reference pre-refactor service paths; prefer the domain-based paths under `backend/common/services/`.
 
 ## 16. Guidance for the Assistant

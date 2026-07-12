@@ -165,9 +165,12 @@ Status key: `Good`, `Partial`, `Needs Change`.
    - Add domain allowlist/denylist and request budget in `backend/common/services/search/web_search.py`.
 3. Privacy minimization in telemetry.
    - Store clipboard hash+URL only by default; gate raw clipboard text behind explicit "expanded capture" consent.
-4. Lazy heavy-model initialization.
-   - Move `SentenceTransformer` initialization out of module import in `vector_db.py`.
-   - Remove unused embedder startup from `backend/desktop/services/ai_worker.py`.
+4. Lazy heavy-model initialization. **Completed.**
+   - `vector_db.py` imports and initializes `SentenceTransformer` on the first
+     embedding operation under a lock.
+   - The public `sentence-transformers/all-MiniLM-L6-v2` model is downloaded
+     from Hugging Face on first use and then loaded from the local model cache.
+     `HF_TOKEN` is optional and only improves Hub rate limits and reliability.
 
 ### P2
 1. Replace ad-hoc SQLite migration with migration tool (Alembic or SQLModel-compatible migration flow).

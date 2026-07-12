@@ -1,4 +1,0 @@
--r requirements.txt
-fastapi
-uvicorn
-psycopg[binary]

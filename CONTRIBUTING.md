@@ -38,9 +38,11 @@
 
 ## Verification
 
-- Backend compile check: `python -m compileall backend`
+- Backend tests: `.\venv_win\Scripts\python.exe -m pytest tests`
+- Backend compile check: `.\venv_win\Scripts\python.exe -m compileall backend scripts`
 - Frontend build check: `npm run build` (in `frontend/`)
-- Run targeted scripts in `scripts/verify/` for affected areas.
+- Run targeted scripts in `scripts/verify/` for affected areas that are not yet
+  covered by pytest.
 - Storage changes must run `verify_desktop_database_upgrade.py`,
   `verify_manual_database_management.py`, `verify_storage_modes.py`, and the
   relevant Qdrant verification scripts.
