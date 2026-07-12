@@ -13,7 +13,7 @@ Lumeward is a hybrid AI brief/newsletter application with shared backend service
 
 - CLI startup overrides are implemented in `backend/main.py`:
   - `--mode {desktop,server}`
-  - `--auth-mode {trusted_lan,interactive}`
+  - `--auth-mode {shared,trusted_lan,interactive}`
   - `--host`
   - `--port`
   - `--reload`
@@ -25,9 +25,9 @@ Lumeward is a hybrid AI brief/newsletter application with shared backend service
 ### Auth and deployment
 
 - Web/server mode supports:
-  - `AUTH_MODE=trusted_lan`
+  - `AUTH_MODE=shared` (`trusted_lan` remains a legacy alias)
   - `AUTH_MODE=interactive`
-- Desktop mode always resolves to the local trusted-lan style path.
+- Desktop mode supports a local identity or an interactive connection to an enterprise server.
 - `modes.md` is the operator-facing source of truth for runtime and trust modes.
 
 ### Remote engine support
@@ -104,6 +104,16 @@ files are cleaned up.
   - `Light`
 - Theme changes apply immediately without restart.
 - The main desktop view is wrapped in a scroll area so the whole screen can be reached with the mouse wheel.
+- Enterprise users can configure a server URL, authenticate, select a workspace,
+  generate against authorized workspace context, and explicitly share supported files or opted-in collector context.
+
+### Enterprise foundations
+
+- Interactive users have individual identities and opaque server sessions.
+- Organizations, workspaces, memberships, scoped context, tags, user tag preferences,
+  workspace tag policies, plugin manifests, and independent plugin grants are implemented.
+- Plugin execution and plugin-driven ingestion remain future work.
+- Self-signup is intended for development; production enterprise deployments should provision identities centrally.
 
 ### Desktop bridge
 
@@ -128,6 +138,7 @@ files are cleaned up.
 ```powershell
 .\venv_win\Scripts\uv.exe sync
 .\venv_win\Scripts\uv.exe sync --extra desktop
+.\venv_win\Scripts\uv.exe sync --extra dev
 .\venv_win\Scripts\uv.exe sync --extra packaging
 ```
 
@@ -205,20 +216,15 @@ Server:
 
 ```powershell
 cd C:\Dev\lumeward
-.\venv_win\Scripts\python.exe scripts\dev\database.py status
-.\venv_win\Scripts\python.exe scripts\dev\database.py initialize
-.\venv_win\Scripts\python.exe backend\main.py
+.\venv_win\Scripts\uv.exe run lumeward --mode server
 ```
 
-Server mode requires `DATABASE_URL` pointing to PostgreSQL and `QDRANT_URL`
-pointing to a Qdrant service; a service on `127.0.0.1` is supported. It never
-falls back to SQLite or embedded Qdrant. Desktop mode continues to use local
-SQLite and embedded Qdrant data.
-Keep both storage configurations in `.env` and change only `APP_MODE` to switch
-between `DESKTOP` and `SERVER`.
+Server mode requires PostgreSQL. Qdrant may be administrator-managed
+(`QDRANT_MODE=external`) or a native executable owned by the Lumeward server
+(`QDRANT_MODE=bundled`). Server startup creates missing application tables and
+idempotently reconciles the event-ownership columns; it does not use schema versions.
 
-During the pre-release phase, server schema changes use an explicit destructive
-refresh instead of automatic migrations:
+The development database helper still supports explicitly confirmed destructive refreshes:
 
 ```powershell
 .\venv_win\Scripts\python.exe scripts\dev\database.py refresh --confirm lumeward

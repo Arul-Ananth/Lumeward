@@ -1,5 +1,12 @@
 # Lumeward Enterprise Team-Context Architecture Assessment
 
+> **Historical assessment (2026-07-12):** This records the pre-implementation
+> findings that motivated the enterprise work. Its claims about missing event
+> ownership, organizations, workspaces, tags and plugin-grant models are no
+> longer current. Use `architecture/overview.md`, `modes.md` and `roadmap.md`
+> for implemented status. Plugin execution, enterprise identity federation,
+> compliance operations and complete member onboarding remain future work.
+
 Date: 2026-07-12
 
 Status: architecture assessment only. This document does not implement the proposed changes and is not legal advice.

@@ -12,12 +12,14 @@ Lumeward is a hybrid AI brief assistant with two runtime modes built on a shared
 
 - `SERVER`
   - FastAPI backend for web clients.
-  - Supports `trusted_lan` and `interactive` auth profiles.
+  - Supports canonical `shared` and `interactive` auth profiles; `trusted_lan` is a legacy alias.
+  - Provides organizations, workspaces, scoped context, tags and plugin-grant metadata.
   - Can optionally route model calls through a remote OpenAI-compatible engine.
   - Supports explicit `.zip` folder upload through `/news/ingest/folder` for local indexing.
 - `DESKTOP`
   - PySide6 desktop app.
   - Local bridge ingestion, OCR, clipboard/file context capture, and brief generation.
+  - Can authenticate to an enterprise server and select an authorized workspace.
   - Desktop UI is structured around `Personal Feed`, collapsible `Guidance`, and `Deep Dive Viewer`.
 
 ## Runtime and Trust Summary

@@ -1,5 +1,8 @@
 # Clipboard History Diagnosis
 
+> Historical resolved diagnosis. Current privacy behavior is documented in
+> `../security.md` and `../../modes.md`.
+
 Date: 2026-03-21
 Status: Resolved
 Resolution verified: 2026-07-12

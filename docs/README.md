@@ -1,42 +1,39 @@
 # Documentation Index
 
-- Architecture
-  - `architecture/overview.md`
-  - `architecture/openclaw_parity_privacy_security_recommendations.md`
-- Runtime / Modes
-  - `../modes.md`
-- Security
-  - `security.md`
-- Status / Roadmap
-  - `roadmap.md`
-- Audits
-  - `audits/issues.md`
-  - `audits/clipboard_history_diagnosis.md`
-- Prompts
-  - `prompts/system_prompt.md`
-  - `prompts/context_restoration_system_prompt.md`
-- Samples
-  - `samples/ingestion/` (documentation-only sample assets)
+## Current sources of truth
 
-## Current Priority Docs
+- `../README.md`: setup, dependencies, implemented product summary and startup.
+- `../modes.md`: local desktop, enterprise desktop, server, auth and Qdrant profiles.
+- `architecture/overview.md`: current code and domain architecture.
+- `architecture/migration_strategy.md`: versionless desktop/server schema behavior.
+- `security.md`: current trust boundaries, safeguards and deferred hardening.
+- `roadmap.md`: implemented, next and explicitly deferred work.
+- `deployment/enterprise-packaging.md`: native Qdrant and server/desktop distribution model.
 
-- `../README.md`
-  - operator-facing summary of current implemented behavior
-- `../modes.md`
-  - runtime modes, trust profiles, and connectivity profiles
-- `architecture/overview.md`
-  - current implementation shape across backend, desktop, server, and search/memory
-- `roadmap.md`
-  - implemented work so far plus optional future items that may or may not be implemented
+## Component documentation
 
-## Prompt Docs
+- `../backend/desktop/README.md`
+- `../backend/server/README.md`
+- `../backend/common/services/auth/README.md`
+- `../frontend/README.md`
+- `../scripts/dev/README.md`
 
-- `prompts/system_prompt.md`
-  - short compatibility-facing context restoration prompt
-- `prompts/context_restoration_system_prompt.md`
-  - fuller repo-context prompt for implementation work
+## Historical material
 
-## Notes
+The following files are retained for decision history and are not statements of
+current implementation:
 
-- `roadmap.md` is intentionally split into implemented work and non-committed future items.
-- If there is any mismatch between docs, prefer the code and then update the docs accordingly.
+- `architecture/enterprise_team_context_assessment.md`
+- `architecture/openclaw_parity_privacy_security_recommendations.md`
+- `frontend_desktop_feature_parity_plan.md`
+- `audits/issues.md`
+- `audits/clipboard_history_diagnosis.md`
+
+## Agent prompts
+
+- `prompts/system_prompt.md` is a short compatibility aid.
+- `prompts/context_restoration_system_prompt.md` is deprecated and points to the
+  current source-of-truth documents.
+
+When documentation and code disagree, treat code as authoritative and update
+the active documentation in the same change.

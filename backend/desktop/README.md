@@ -3,8 +3,9 @@
 - `backend/desktop/main.py` boots Qt, ensures the local desktop identity, and starts the bridge process.
 - `backend/desktop/telemetry_manager.py` coordinates collectors and delegates async work to `backend/desktop/services/telemetry_runtime.py`.
 - The desktop bridge remains protected by the per-session `X-Bridge-Token` header.
-- Desktop storage always uses local SQLite and embedded Qdrant. Server
-  `DATABASE_URL` and `QDRANT_URL` values are ignored in desktop mode.
+- Local desktop storage uses SQLite and embedded Qdrant. When an Enterprise
+  Server URL is configured, generation and explicitly shared context use the
+  authenticated server workspace while local UI preferences remain on the device.
 
 ## Linux / WSL Setup
 

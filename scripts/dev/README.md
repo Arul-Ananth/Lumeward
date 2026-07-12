@@ -10,8 +10,7 @@ Beta 1.0 packaging uses `packaging/pyinstaller/Lumeward.spec` as the single PyIn
 Install packaging dependencies with:
 
 ```powershell
-.\venv_win\Scripts\python.exe -m pip install uv
-.\venv_win\Scripts\python.exe -m uv pip sync --torch-backend cpu requirements-packaging.lock.txt
+.\venv_win\Scripts\uv.exe sync --extra packaging
 ```
 
 Edit `requirements-packaging.in` for direct packaging dependency changes, then

@@ -1,5 +1,10 @@
 # Frontend and Desktop Feature Parity Plan
 
+> **Archived proposal:** Lumeward currently keeps PySide as the normal desktop
+> client and allows it to connect directly to enterprise workspaces. The React-
+> canonical direction proposed below was not adopted and must not be treated as
+> current implementation guidance.
+
 ## Status
 
 This document is an implementation proposal, not authorization to change the
@@ -935,4 +940,3 @@ The user must choose:
 
 No implementation should begin until these decisions are confirmed by the
 user.
-

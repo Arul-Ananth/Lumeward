@@ -5,6 +5,6 @@
 - Routes should depend on the auth resolver and typed schemas, not direct mode flags.
 - Server mode requires PostgreSQL through `DATABASE_URL` and a Qdrant service
   through `QDRANT_URL`.
-- Run `python scripts/dev/database.py status` and `initialize` before first use.
+- The PostgreSQL database and role must exist before first use; application tables are created at startup.
 - Startup creates missing tables and idempotently adds the event-ownership columns required by older databases.
 - `/health/live` reports process health; `/health/ready` checks PostgreSQL and Qdrant.

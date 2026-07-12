@@ -24,8 +24,9 @@ npm run dev
 ```
 
 The backend URL and authentication behavior are defined by the shared frontend
-API client and the server's runtime configuration. Do not store server secrets
-in frontend environment variables or browser storage.
+API client and the server's runtime configuration. Provider, database and server
+secrets must never be placed in frontend configuration. Interactive auth currently
+stores its opaque session token in browser `sessionStorage`.
 
 ## Verification
 
@@ -42,4 +43,5 @@ generated and must not be committed.
 The frontend supports Lumeward's server authentication modes. Trusted-LAN mode
 uses the server's shared trusted identity and must only be exposed on a trusted
 network. Interactive mode uses the sign-up, sign-in, session-status, and logout
-routes provided by the backend.
+routes provided by the backend. Workspace-aware requests must send the selected
+`X-Workspace-ID` header.

@@ -1,5 +1,8 @@
 # Lumeward Codebase Issue Audit
 
+> Historical audit snapshot. See `../architecture/overview.md` and
+> `../roadmap.md` for current implementation status.
+
 Date: 2026-06-04
 Scope: Static review of backend, desktop, frontend, docs, packaging metadata, and local ignored artifacts.
 Checks run during cleanup:

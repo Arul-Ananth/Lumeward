@@ -2,7 +2,8 @@
 
 ## Current shape
 
-- `trusted_lan` provider creates or resolves one synthetic LAN identity and bypasses browser login.
+- Canonical `shared` mode uses the trusted-LAN provider to create or resolve one
+  synthetic identity and bypass login. `trusted_lan` remains a legacy alias.
 - `interactive` provider uses password credentials plus server-stored opaque sessions.
 - Business routes depend on `AuthPrincipal`, not on the session transport directly.
 

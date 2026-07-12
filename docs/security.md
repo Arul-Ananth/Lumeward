@@ -1,75 +1,58 @@
 # Security Notes
 
-## Current Modes
+Lumeward is currently intended for local desktop use and internally managed
+enterprise deployments. It is not internet-ready without normal infrastructure
+hardening.
 
-Lumeward now supports two web auth modes.
+## Identity
 
-- `AUTH_MODE=trusted_lan`
-  - one synthetic LAN identity is resolved on the server
-  - browser sign-in is bypassed
-  - memory/profile state is shared for that trusted identity
-- `AUTH_MODE=interactive`
-  - sign-in/sign-up remain active
-  - the server issues opaque session tokens
-  - business routes resolve a normalized principal through the auth resolver
+- `AUTH_MODE=interactive` gives each server user an individual identity and opaque bearer session.
+- `AUTH_MODE=shared` uses one synthetic identity. The legacy `trusted_lan` value remains accepted.
+- Shared mode is unsuitable for individual audit, revocation or team boundaries.
+- Desktop self-signup is a development convenience. Production should use administrator or identity-provider provisioning.
+- The React client currently stores its session token in `sessionStorage`.
 
-`TRUSTED_LAN_MODE` is still accepted as a backward-compatible fallback for older env files, but the preferred selector is `AUTH_MODE`.
+## Authorization and context
 
-## Trust Boundaries
+- Organization and workspace membership is checked server-side.
+- Clients select a workspace with `X-Workspace-ID`.
+- Event queries and Qdrant retrieval apply user/workspace/organization filters.
+- Enterprise desktop generation requires a selected workspace.
+- File drops and browser-bridge sharing are explicit actions.
+- Clipboard content requires telemetry, clipboard and raw-text consent.
+- Retrieved context is untrusted input and never an authorization mechanism.
 
-- FastAPI server:
-  - trusted-LAN mode is intended for private network use only
-  - server storage requires PostgreSQL and a Qdrant service configured through
-    `QDRANT_URL`; localhost is supported, while embedded fallback is rejected
-  - interactive mode improves auth boundaries but still requires normal deployment hardening before public exposure
-  - folder upload accepts explicit `.zip` archives only through authenticated `/news/ingest/folder`
-- Desktop bridge:
-  - loopback only
-  - protected with a runtime-generated bridge token header
-- External network tools:
-  - network actions are filtered through a security policy layer
-  - non-approved actions are denied and logged
+## Storage
 
-## Current Safeguards
+- Desktop storage is local SQLite plus embedded Qdrant.
+- Server storage is PostgreSQL plus external or bundled Qdrant.
+- Bundled Qdrant should bind to loopback, use an API key and use a dedicated data directory.
+- Runtime Qdrant storage, `.env`, local databases and secret material are ignored by Git.
+- Server startup reconciles ownership columns, so the database role needs the corresponding DDL permissions during this pre-release phase.
 
-- Env-driven host, port, and CORS allowlist
-- Typed request schemas with `extra="forbid"`
-- Auth provider and transport separation for web identity resolution
-- Server-stored opaque interactive sessions
-- Trusted-LAN synthetic identity isolation from interactive identities
-- Bridge token validation on `/ingest`
-- Structured security-policy audit logging
-- Clipboard collection opt-in
-- Desktop telemetry disabled by default unless the user opts in
-- Raw clipboard text disabled by default
-- Tool/network policy checks before external search requests
-- Server folder upload is disabled/enabled through `FOLDER_UPLOAD_ENABLED`.
-- Folder upload staging is constrained to `DATA_DIR / FOLDER_UPLOAD_DIR`.
-- `FOLDER_UPLOAD_DIR` must be relative and cannot escape `DATA_DIR`.
-- Upload cleanup deletes only managed staging files on server startup when `FOLDER_UPLOAD_DELETE_ON_RESTART=true`.
-- Upload validation rejects path traversal, absolute zip paths, symlinks,
-  unsupported extensions, too many files, compressed archives larger than
-  `FOLDER_UPLOAD_MAX_ARCHIVE_MB`, and archives that expand beyond
-  `FOLDER_UPLOAD_MAX_EXPANDED_MB`.
-- Uploaded source files are indexed into the active relational database and
-  Qdrant; indexed state is not deleted by staging cleanup.
-- The default compressed archive limit is 250 MB and the default expanded limit
-  is 1000 MB; operators can lower or raise both values in `.env`.
+## Existing safeguards
 
-## Deferred Items
+- Strict typed API schemas and opaque, revocable interactive sessions.
+- Workspace membership validation and scoped SQL/vector retrieval.
+- Loopback-only, token-protected desktop bridge.
+- Opt-in telemetry with raw clipboard storage disabled by default.
+- ZIP traversal, symlink, extension, file-count and size validation.
+- Network/tool policy checks for supported external actions.
+- Plugin grants are metadata only; no plugin code executes.
 
-These are still open future work, not removed from the architecture:
+## Required operational controls
 
-- alternative auth transports such as cookies or external IdPs
-- per-user memory isolation improvements beyond the current shared trusted-LAN identity
-- internet-facing reverse proxy and TLS deployment profile
-- stronger session rotation and revocation controls
+- TLS and a reverse proxy for network deployment.
+- Strong generated secrets and rotation procedures.
+- Least-privilege service accounts and restricted data directories.
+- PostgreSQL/Qdrant backups, retention rules and restore testing.
+- Central provisioning, deprovisioning and MFA before broad enterprise rollout.
+- Audit, deletion/export and data-residency procedures appropriate to customer obligations.
 
-## Future Direction
+## Deferred security work
 
-When Lumeward moves beyond the current deployment profile, the next hardening steps should be:
-
-1. provider-specific auth adapters for the chosen web auth system
-2. per-user memory isolation across all web modes
-3. reverse proxy + TLS
-4. stronger session lifecycle controls and public exposure hardening
+- OIDC federation and group/role synchronization.
+- Complete organization-member administration.
+- Retention/deletion enforcement across SQL, Qdrant, backups and derived artifacts.
+- Isolated plugin workers, plugin secrets and enforced egress/filesystem grants.
+- A reviewed public-internet deployment profile.
