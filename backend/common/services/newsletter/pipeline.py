@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta
+from dataclasses import dataclass
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlmodel import Session, select
@@ -35,6 +36,21 @@ CURRENT_EVENTS_TERMS = (
     "current events",
     "headlines",
 )
+
+
+@dataclass(frozen=True)
+class GenerationRequest:
+    """Canonical input shared by interactive, feed, and scheduled generation."""
+
+    user_id: int
+    topic: str
+    source: str = "interactive"
+    template_key: str | None = None
+    context: str = ""
+    api_keys: dict | None = None
+    session_id: str | None = None
+    source_schedule_id: int | None = None
+    persist: bool = True
 
 
 def sync_builtin_templates(session: Session) -> None:
@@ -128,6 +144,19 @@ def mark_schedule_run(session: Session, schedule: NewsletterSchedule) -> None:
 
 
 class NewsletterPipeline:
+    async def generate(self, request: GenerationRequest, *, session: Session | None = None) -> NewsResponse:
+        return await self.generate_newsletter(
+            topic=request.topic,
+            user_id=request.user_id,
+            session=session,
+            context=request.context,
+            api_keys=request.api_keys,
+            session_id=request.session_id,
+            template_key=request.template_key,
+            source_schedule_id=request.source_schedule_id,
+            persist=request.persist,
+        )
+
     async def generate_newsletter(
         self,
         *,

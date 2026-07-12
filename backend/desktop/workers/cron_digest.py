@@ -9,7 +9,7 @@ from datetime import datetime
 from sqlmodel import Session
 
 from backend.common.database import get_engine
-from backend.common.services.newsletter.pipeline import due_schedules, mark_schedule_run, newsletter_pipeline
+from backend.common.services.newsletter.pipeline import GenerationRequest, due_schedules, mark_schedule_run, newsletter_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -46,12 +46,15 @@ class CronDigestWorker:
             for schedule in schedules:
                 try:
                     asyncio.run(
-                        newsletter_pipeline.generate_newsletter(
-                            topic=schedule.topic_seed,
-                            user_id=schedule.user_id,
+                        newsletter_pipeline.generate(
+                            GenerationRequest(
+                                topic=schedule.topic_seed,
+                                user_id=schedule.user_id,
+                                source="schedule",
+                                template_key=schedule.template_key,
+                                source_schedule_id=schedule.id,
+                            ),
                             session=session,
-                            template_key=schedule.template_key,
-                            source_schedule_id=schedule.id,
                         )
                     )
                     mark_schedule_run(session, schedule)

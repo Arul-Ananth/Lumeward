@@ -11,31 +11,10 @@ from backend.common.services.ingestion import folder_upload
 from backend.common.services.ingestion.folder_upload import cleanup_managed_uploads_on_startup, ingest_folder_zip
 
 
-class _Vectors:
-    def __init__(self, count: int) -> None:
-        self._vectors = [[0.1] * 384 for _ in range(count)]
-
-    def tolist(self) -> list[list[float]]:
-        return self._vectors
-
-
-class _Embedder:
-    def encode(self, chunks):
-        return _Vectors(len(chunks))
-
-
-class _Client:
-    def __init__(self) -> None:
-        self.points = []
-
-    def upsert(self, *, collection_name, points) -> None:
-        self.points.extend(points)
-
-
-def test_ingest_folder_zip_indexes_text_files_without_network(monkeypatch, isolated_data_dir) -> None:
-    client = _Client()
+def test_ingest_folder_zip_indexes_text_files_without_network(monkeypatch, isolated_data_dir, fake_embedder, fake_qdrant) -> None:
+    client = fake_qdrant
     monkeypatch.setattr(folder_upload, "ensure_collection", lambda _: None)
-    monkeypatch.setattr(folder_upload, "get_embedder", lambda: _Embedder())
+    monkeypatch.setattr(folder_upload, "get_embedder", lambda: fake_embedder)
     monkeypatch.setattr(folder_upload, "client", client)
 
     archive_path = isolated_data_dir / "folder.zip"
@@ -59,10 +38,10 @@ def test_ingest_folder_zip_indexes_text_files_without_network(monkeypatch, isola
         assert session.exec(select(EventRaw).where(EventRaw.event_type == "file_ingestion")).one()
 
 
-def test_ingest_folder_zip_rejects_unsafe_paths(monkeypatch, isolated_data_dir) -> None:
+def test_ingest_folder_zip_rejects_unsafe_paths(monkeypatch, isolated_data_dir, fake_embedder, fake_qdrant) -> None:
     monkeypatch.setattr(folder_upload, "ensure_collection", lambda _: None)
-    monkeypatch.setattr(folder_upload, "get_embedder", lambda: _Embedder())
-    monkeypatch.setattr(folder_upload, "client", _Client())
+    monkeypatch.setattr(folder_upload, "get_embedder", lambda: fake_embedder)
+    monkeypatch.setattr(folder_upload, "client", fake_qdrant)
     archive_path = isolated_data_dir / "bad.zip"
     archive_path.write_bytes(_zip_bytes({"../escape.md": "bad"}))
 
@@ -80,10 +59,10 @@ def test_ingest_folder_zip_rejects_unsafe_paths(monkeypatch, isolated_data_dir) 
             raise AssertionError("unsafe archive path was accepted")
 
 
-def test_cleanup_managed_uploads_preserves_indexed_metadata(monkeypatch, isolated_data_dir) -> None:
-    client = _Client()
+def test_cleanup_managed_uploads_preserves_indexed_metadata(monkeypatch, isolated_data_dir, fake_embedder, fake_qdrant) -> None:
+    client = fake_qdrant
     monkeypatch.setattr(folder_upload, "ensure_collection", lambda _: None)
-    monkeypatch.setattr(folder_upload, "get_embedder", lambda: _Embedder())
+    monkeypatch.setattr(folder_upload, "get_embedder", lambda: fake_embedder)
     monkeypatch.setattr(folder_upload, "client", client)
     archive_path = isolated_data_dir / "folder.zip"
     archive_path.write_bytes(_zip_bytes({"notes/readme.md": "Cleanup should not delete metadata."}))

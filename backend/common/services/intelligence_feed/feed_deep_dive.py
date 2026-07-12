@@ -7,7 +7,7 @@ from sqlmodel import Session
 from backend.common.models.sql import EventRaw
 from backend.common.security.policy import InputSanitizer
 import backend.common.services.intelligence_feed.repository as repository
-from backend.common.services.newsletter.pipeline import newsletter_pipeline
+from backend.common.services.newsletter.pipeline import GenerationRequest, newsletter_pipeline
 
 _sanitizer = InputSanitizer()
 
@@ -25,13 +25,16 @@ async def run_deep_dive(
         raise ValueError("Feed card not found.")
 
     context = _card_context(session, row.raw_event_ids_json)
-    result = await newsletter_pipeline.generate_newsletter(
-        topic=row.title,
-        user_id=user_id,
+    result = await newsletter_pipeline.generate(
+        GenerationRequest(
+            topic=row.title,
+            user_id=user_id,
+            source="feed_deep_dive",
+            context=context,
+            api_keys=api_keys or {},
+            session_id=session_id,
+        ),
         session=session,
-        context=context,
-        api_keys=api_keys or {},
-        session_id=session_id,
     )
     digest_id = _latest_digest_id(session, user_id)
     if digest_id is not None:

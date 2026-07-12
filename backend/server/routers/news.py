@@ -36,6 +36,7 @@ from backend.common.services.auth.types import AuthPrincipal
 from backend.common.services.memory import vector_db
 from backend.common.services.memory.vector_db import QdrantUnavailableError
 from backend.common.services.newsletter.pipeline import (
+    GenerationRequest,
     archive_digest,
     get_digest,
     list_digests,
@@ -65,12 +66,15 @@ async def generate_news(
     context = await asyncio.to_thread(vector_db.get_user_context, principal.user_id, request.topic)
 
     try:
-        result_response = await newsletter_pipeline.generate_newsletter(
-            topic=request.topic,
-            user_id=principal.user_id,
+        result_response = await newsletter_pipeline.generate(
+            GenerationRequest(
+                topic=request.topic,
+                user_id=principal.user_id,
+                source="web",
+                context=str(context),
+                template_key=request.template_key,
+            ),
             session=session,
-            context=str(context),
-            template_key=request.template_key,
         )
         content = result_response.content
     except QdrantUnavailableError:

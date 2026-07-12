@@ -15,6 +15,37 @@ from backend.common.database import create_db_and_tables, dispose_database
 from backend.common.services.memory import vector_db
 
 
+class FakeVectors:
+    def __init__(self, count: int) -> None:
+        self._vectors = [[0.1] * 384 for _ in range(count)]
+
+    def tolist(self) -> list[list[float]]:
+        return self._vectors
+
+
+class FakeEmbedder:
+    def encode(self, chunks):
+        return FakeVectors(len(chunks))
+
+
+class FakeQdrantClient:
+    def __init__(self) -> None:
+        self.points = []
+
+    def upsert(self, *, collection_name, points) -> None:
+        self.points.extend(points)
+
+
+@pytest.fixture
+def fake_embedder() -> FakeEmbedder:
+    return FakeEmbedder()
+
+
+@pytest.fixture
+def fake_qdrant() -> FakeQdrantClient:
+    return FakeQdrantClient()
+
+
 @pytest.fixture
 def isolated_data_dir(tmp_path: Path) -> Iterator[Path]:
     original_values = {

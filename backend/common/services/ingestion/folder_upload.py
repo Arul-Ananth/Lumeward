@@ -1,22 +1,16 @@
 from __future__ import annotations
 
-import hashlib
-import json
 import shutil
 import uuid
 import zipfile
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path, PurePosixPath
 
-from qdrant_client.http import models
 from sqlmodel import Session
 
 from backend.common.config import settings
-from backend.common.models.sql import EventRaw, FilesIndex
 from backend.common.services.memory.vector_db import client, ensure_collection, get_embedder
-from backend.common.services.memory.point_ids import stable_point_id
-from backend.common.services.telemetry.ingestion import chunk_text, extract_text_from_file, file_sha256
+from backend.common.services.ingestion.document_service import document_ingestion
 
 ALLOWED_EXTENSIONS = {".txt", ".md", ".html", ".pdf", ".docx"}
 
@@ -164,97 +158,17 @@ def _is_zip_symlink(member: zipfile.ZipInfo) -> bool:
 
 
 def _ingest_file(session: Session, *, path: Path, user_id: int, session_id: str, batch_id: str) -> str:
-    max_bytes = settings.DOC_MAX_MB * 1024 * 1024
-    try:
-        if path.stat().st_size > max_bytes:
-            _upsert_file_index(session, path, "skipped", "File exceeds size limit")
-            return "skipped"
-
-        content_hash = file_sha256(path)
-        mtime = path.stat().st_mtime
-        existing = session.get(FilesIndex, str(path))
-        if existing and existing.content_hash == content_hash and existing.status == "ingested":
-            return "skipped"
-
-        text, error = extract_text_from_file(path)
-        if error:
-            _upsert_file_index(session, path, "error", error, content_hash, mtime)
-            return "failed"
-        chunks = chunk_text(text or "", settings.CHUNK_SIZE, settings.CHUNK_OVERLAP)
-        if not chunks:
-            _upsert_file_index(session, path, "skipped", "No text extracted", content_hash, mtime)
-            return "skipped"
-
-        ensure_collection(settings.QDRANT_COLLECTION_USER_DOCS)
-        vectors = get_embedder().encode(chunks).tolist()
-        points = [
-            models.PointStruct(
-                id=stable_point_id("document", user_id, content_hash, index),
-                vector=vectors[index],
-                payload={
-                    "document": chunk,
-                    "user_id": str(user_id),
-                    "path": str(path),
-                    "chunk_index": index,
-                    "upload_batch_id": batch_id,
-                    "timestamp": datetime.utcnow().isoformat(),
-                },
-            )
-            for index, chunk in enumerate(chunks)
-        ]
-        client.upsert(collection_name=settings.QDRANT_COLLECTION_USER_DOCS, points=points)
-        _upsert_file_index(session, path, "ingested", None, content_hash, mtime)
-        _persist_file_event(session, path=path, user_id=user_id, session_id=session_id, content_hash=content_hash)
-        return "ingested"
-    except Exception as exc:
-        _upsert_file_index(session, path, "error", str(exc))
-        return "failed"
-
-
-def _upsert_file_index(
-    session: Session,
-    path: Path,
-    status: str,
-    error: str | None,
-    content_hash: str | None = None,
-    mtime: float | None = None,
-) -> None:
-    record = session.get(FilesIndex, str(path))
-    if record is None:
-        record = FilesIndex(path=str(path), content_hash=content_hash or "", mtime=mtime or 0.0)
-    record.status = status
-    record.error = error
-    if content_hash is not None:
-        record.content_hash = content_hash
-    if mtime is not None:
-        record.mtime = mtime
-    record.last_ingested_at = datetime.utcnow()
-    session.add(record)
-    session.commit()
-
-
-def _persist_file_event(session: Session, *, path: Path, user_id: int, session_id: str, content_hash: str) -> None:
-    payload = {
-        "path": str(path),
-        "user_id": user_id,
-        "content_hash": content_hash,
-        "ts": datetime.utcnow().isoformat(),
-        "consent": "folder_zip_upload",
-    }
-    event = EventRaw(
-        event_type="file_ingestion",
+    return document_ingestion.ingest(
+        session,
+        path=path,
+        user_id=user_id,
         session_id=session_id,
-        payload_json=json.dumps(payload, ensure_ascii=True),
-        hash=_event_hash(payload),
+        batch_id=batch_id,
         source="folder_upload",
+        ensure_collection_fn=ensure_collection,
+        embedder_fn=get_embedder,
+        qdrant_client=client,
     )
-    session.add(event)
-    session.commit()
-
-
-def _event_hash(payload: dict) -> str:
-    raw = json.dumps(payload, sort_keys=True)
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
 def _safe_archive_name(filename: str) -> str:

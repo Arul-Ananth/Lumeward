@@ -15,7 +15,7 @@ from backend.common.services.llm.provider_factory import check_remote_engine_rea
 def build_cli_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Start Lumeward in server or desktop mode.")
     parser.add_argument("--mode", choices=("desktop", "server"))
-    parser.add_argument("--auth-mode", choices=("trusted_lan", "interactive"))
+    parser.add_argument("--auth-mode", choices=("shared", "trusted_lan", "interactive"))
     parser.add_argument("--host")
     parser.add_argument("--port", type=int)
     parser.add_argument("--reload", action="store_true")
@@ -24,7 +24,9 @@ def build_cli_parser() -> argparse.ArgumentParser:
 
 def apply_cli_overrides(args: argparse.Namespace) -> tuple[AppMode, bool]:
     app_mode = AppMode(args.mode.upper()) if args.mode else settings.APP_MODE
-    auth_mode = AuthMode(args.auth_mode) if args.auth_mode else None
+    auth_mode = AuthMode.INTERACTIVE if args.auth_mode == "interactive" else (
+        AuthMode.SHARED if args.auth_mode in {"shared", "trusted_lan"} else None
+    )
 
     if app_mode == AppMode.DESKTOP and (args.host or args.port or args.reload):
         raise ValueError("--host, --port, and --reload are only valid in server mode.")

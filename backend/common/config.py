@@ -18,7 +18,8 @@ class AppMode(str, Enum):
 
 
 class AuthMode(str, Enum):
-    TRUSTED_LAN = "trusted_lan"
+    SHARED = "shared"
+    TRUSTED_LAN = "shared"
     INTERACTIVE = "interactive"
 
 
@@ -31,8 +32,8 @@ class Settings(BaseSettings):
     SERVER_PORT: int = 8000
     SERVER_WORKERS: int = 1
     CORS_ALLOWED_ORIGINS: str = "http://localhost:5173"
-    TRUSTED_LAN_MODE: bool = True
-    AUTH_MODE: AuthMode | None = None
+    TRUSTED_LAN_MODE: bool = True  # deprecated fallback for older env files
+    AUTH_MODE: str | None = None
     TRUSTED_LAN_USER_EMAIL: str = "local@lan"
     TRUSTED_LAN_USER_NAME: str = "Trusted LAN User"
     AUTH_SESSION_EXPIRE_MINUTES: int = 720
@@ -98,10 +99,13 @@ class Settings(BaseSettings):
 
     def auth_mode(self) -> AuthMode:
         if self.APP_MODE == AppMode.DESKTOP:
-            return AuthMode.TRUSTED_LAN
-        if self.AUTH_MODE is not None:
-            return self.AUTH_MODE
-        return AuthMode.TRUSTED_LAN if self.TRUSTED_LAN_MODE else AuthMode.INTERACTIVE
+            return AuthMode.SHARED
+        configured = (self.AUTH_MODE or "").strip().lower()
+        if configured in {"shared", "trusted_lan"}:
+            return AuthMode.SHARED
+        if configured == AuthMode.INTERACTIVE.value:
+            return AuthMode.INTERACTIVE
+        return AuthMode.SHARED if self.TRUSTED_LAN_MODE else AuthMode.INTERACTIVE
 
     def is_trusted_lan_auth(self) -> bool:
         return self.auth_mode() == AuthMode.TRUSTED_LAN

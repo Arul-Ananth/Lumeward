@@ -47,18 +47,21 @@ class AIWorker(QThread):
             return
 
         try:
-            from backend.common.services.newsletter.pipeline import newsletter_pipeline
+            from backend.common.services.newsletter.pipeline import GenerationRequest, newsletter_pipeline
 
             self.status_message.emit("Starting AI generation...")
             with Session(get_engine()) as session:
                 result = asyncio.run(
-                    newsletter_pipeline.generate_newsletter(
-                        topic=self.topic,
-                        user_id=self.user_id,
+                    newsletter_pipeline.generate(
+                        GenerationRequest(
+                            topic=self.topic,
+                            user_id=self.user_id,
+                            source="desktop",
+                            context=self.context,
+                            api_keys=self.api_keys,
+                            session_id=self.session_id,
+                        ),
                         session=session,
-                        context=self.context,
-                        api_keys=self.api_keys,
-                        session_id=self.session_id,
                     )
                 )
             if self.isInterruptionRequested() or self._cancelled:

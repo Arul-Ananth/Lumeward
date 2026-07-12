@@ -8,16 +8,14 @@ from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from qdrant_client.http import models
 from sqlmodel import Session, select
 
 from backend.common.config import settings
 from backend.common.database import session_scope
 from backend.common.models.sql import DerivedMemory, EventRaw, FilesIndex
 from backend.common.services.telemetry.event_bus import EventBus, TelemetryEvent
-from backend.common.services.telemetry.ingestion import chunk_text, extract_text_from_file, file_sha256
-from backend.common.services.memory.vector_db import client, ensure_collection, get_embedder
-from backend.common.services.memory.point_ids import stable_point_id
+from backend.common.services.telemetry.ingestion import file_sha256
+from backend.common.services.ingestion.document_service import document_ingestion
 
 logger = logging.getLogger(__name__)
 
@@ -94,50 +92,14 @@ class DocumentIngestionWorker(_AsyncQueueWorker):
             logger.warning("Invalid file ingestion event: %s", event.payload)
             return
 
-        max_bytes = settings.DOC_MAX_MB * 1024 * 1024
-        if path.stat().st_size > max_bytes:
-            _update_file_index(path, "error", "File exceeds size limit")
-            return
-
-        content_hash = file_sha256(path)
-        mtime = path.stat().st_mtime
-
         with session_scope() as session:
-            existing = session.get(FilesIndex, str(path))
-            if existing and existing.content_hash == content_hash and existing.mtime == mtime:
-                _update_file_index(path, "skipped", "Unchanged file", content_hash, mtime)
-                return
-
-        text, error = extract_text_from_file(path)
-        if error:
-            _update_file_index(path, "error", error)
-            return
-
-        chunks = chunk_text(text or "", settings.CHUNK_SIZE, settings.CHUNK_OVERLAP)
-        if not chunks:
-            _update_file_index(path, "error", "No text extracted")
-            return
-
-        ensure_collection(settings.QDRANT_COLLECTION_USER_DOCS)
-        vectors = get_embedder().encode(chunks).tolist()
-        points = []
-        for idx, vector in enumerate(vectors):
-            points.append(
-                models.PointStruct(
-                    id=stable_point_id("document", user_id, content_hash, idx),
-                    vector=vector,
-                    payload={
-                        "document": chunks[idx],
-                        "user_id": str(user_id),
-                        "path": str(path),
-                        "chunk_index": idx,
-                        "timestamp": datetime.utcnow().isoformat(),
-                    },
-                )
+            document_ingestion.ingest(
+                session,
+                path=path,
+                user_id=int(user_id),
+                session_id=event.session_id,
+                source=event.source or "telemetry",
             )
-
-        client.upsert(collection_name=settings.QDRANT_COLLECTION_USER_DOCS, points=points)
-        _update_file_index(path, "ingested", None, content_hash, mtime)
 
 
 class SessionSummaryWorker(_AsyncQueueWorker):
