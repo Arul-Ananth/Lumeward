@@ -1,0 +1,13 @@
+# Lumeward single-node Qdrant configuration.
+# The Lumeward server launcher supplies the storage path and API key as
+# QDRANT__STORAGE__STORAGE_PATH and QDRANT__SERVICE__API_KEY environment values.
+log_level: INFO
+telemetry_disabled: true
+
+service:
+  host: 127.0.0.1
+  http_port: 6333
+  grpc_port: 6334
+
+cluster:
+  enabled: false

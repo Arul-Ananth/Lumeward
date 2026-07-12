@@ -13,7 +13,7 @@ storage during the pre-release phase.
 ## Server
 
 - PostgreSQL databases and roles are created by an administrator.
-- Application startup only checks connectivity and `ApplicationSchema.version`;
+- Application startup creates missing tables, reconciles the event-ownership columns without schema versioning, and checks connectivity.
   it never creates, drops, or upgrades tables.
 - `python scripts/dev/database.py initialize` creates an empty schema.
 - `status` reports connectivity and schema readiness.

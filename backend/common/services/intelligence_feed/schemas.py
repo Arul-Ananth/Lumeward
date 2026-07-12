@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 
@@ -29,3 +29,4 @@ class NormalizedEvent:
     text: str
     created_at: datetime
     content_hash: str
+    tags: list[str] = field(default_factory=list)

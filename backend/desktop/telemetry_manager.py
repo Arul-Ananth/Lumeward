@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class TelemetryManager:
-    def __init__(self, user_id: int, session_id: str, output: QTextEdit) -> None:
+    def __init__(self, user_id: int, session_id: str, output: QTextEdit, enterprise_dispatch=None) -> None:
         self.user_id = user_id
         self.session_id = session_id
         self.output = output
@@ -33,11 +33,17 @@ class TelemetryManager:
         self.reader_telemetry = ReaderTelemetryCollector(output, session_id, self.emit)
         self._data_collection_enabled = settings.DATA_COLLECTION_ENABLED
         self._clipboard_collection_enabled = False
+        self._enterprise_dispatch = enterprise_dispatch
 
     def start(self) -> None:
         self._sync_runtime_preferences()
         if not self._data_collection_enabled:
             logger.info('Desktop telemetry collection disabled by user preference.')
+            return
+
+        if self._enterprise_dispatch is not None:
+            if self._clipboard_collection_enabled:
+                self.clipboard_collector.start(enabled=True)
             return
 
         try:
@@ -59,7 +65,7 @@ class TelemetryManager:
     def shutdown(self) -> None:
         self.clipboard_collector.stop()
         self.folder_watch_collector.stop()
-        if self._data_collection_enabled:
+        if self._data_collection_enabled and self._enterprise_dispatch is None:
             self.runtime.shutdown()
 
         try:
@@ -69,6 +75,12 @@ class TelemetryManager:
 
     def emit(self, event: TelemetryEvent) -> None:
         if not self._data_collection_enabled:
+            return
+        if self._enterprise_dispatch is not None:
+            if event.event_type == "clipboard" and settings.CLIPBOARD_STORE_RAW_TEXT:
+                text = str(event.payload.get("text") or "")
+                if text:
+                    self._enterprise_dispatch(text, "clipboard", "Clipboard")
             return
         self.runtime.enqueue(event)
 

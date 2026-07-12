@@ -5,18 +5,17 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from threading import Lock
 
-from sqlalchemy import Connection, Engine, inspect, text
+from sqlalchemy import Connection, Engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import Session, SQLModel, create_engine
 
 from backend.common.config import AppMode, settings
-from backend.common.models.sql import ApplicationSchema, AuthIdentity, DerivedMemory, SchemaMigration
+from backend.common.models.sql import AuthIdentity, DerivedMemory, EventRaw, SchemaMigration
 
 _engine: Engine | None = None
 _session_factory: sessionmaker | None = None
 _runtime_lock = Lock()
 DesktopMigration = tuple[str, Callable[[Connection], None]]
-SERVER_SCHEMA_VERSION = 1
 
 
 def _build_engine() -> Engine:
@@ -72,14 +71,40 @@ def get_session() -> Iterator[Session]:
 
 
 def create_db_and_tables() -> None:
-    """Create local desktop/test storage; server schemas are initialized manually."""
+    """Create missing tables for the active runtime.
+
+    Existing server tables are intentionally not altered here; database changes
+    are an operational/DBA concern rather than an application version gate.
+    """
     engine = get_engine()
-    if settings.APP_MODE != AppMode.DESKTOP and engine.dialect.name != "sqlite":
-        return
     settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
-    SQLModel.metadata.create_all(engine)
+    if settings.APP_MODE == AppMode.SERVER:
+        SQLModel.metadata.create_all(engine, tables=server_schema_tables())
+        _reconcile_server_schema(engine)
+    else:
+        SQLModel.metadata.create_all(engine)
     if settings.APP_MODE == AppMode.DESKTOP:
         _run_desktop_migrations(engine)
+
+
+def _reconcile_server_schema(engine: Engine) -> None:
+    """Apply the small, idempotent compatibility delta needed by existing PostgreSQL databases."""
+    if engine.dialect.name != "postgresql":
+        return
+    statements = (
+        "ALTER TABLE eventraw ADD COLUMN IF NOT EXISTS organization_id VARCHAR(128)",
+        "ALTER TABLE eventraw ADD COLUMN IF NOT EXISTS workspace_id VARCHAR(128)",
+        'ALTER TABLE eventraw ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES "user"(id)',
+        "ALTER TABLE eventraw ADD COLUMN IF NOT EXISTS visibility VARCHAR(32) NOT NULL DEFAULT 'private'",
+        "CREATE INDEX IF NOT EXISTS ix_eventraw_organization_id ON eventraw (organization_id)",
+        "CREATE INDEX IF NOT EXISTS ix_eventraw_workspace_id ON eventraw (workspace_id)",
+        "CREATE INDEX IF NOT EXISTS ix_eventraw_owner_user_id ON eventraw (owner_user_id)",
+        "CREATE INDEX IF NOT EXISTS ix_eventraw_visibility ON eventraw (visibility)",
+        "CREATE INDEX IF NOT EXISTS ix_eventraw_owner_visibility ON eventraw (owner_user_id, visibility, ts)",
+    )
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
 
 
 def _migration_001_add_derivedmemory_user_id(connection: Connection) -> None:
@@ -129,11 +154,30 @@ def _migration_004_intelligence_feed(connection: Connection) -> None:
     )
 
 
+def _migration_005_event_ownership(connection: Connection) -> None:
+    table_name = getattr(EventRaw, "__tablename__", "eventraw")
+    columns = {row[1] for row in connection.exec_driver_sql(f"PRAGMA table_info('{table_name}')").fetchall()}
+    additions = {
+        "organization_id": "VARCHAR(128)",
+        "workspace_id": "VARCHAR(128)",
+        "owner_user_id": "INTEGER",
+        "visibility": "VARCHAR(32) NOT NULL DEFAULT 'private'",
+    }
+    for column, definition in additions.items():
+        if column not in columns:
+            connection.exec_driver_sql(f"ALTER TABLE {table_name} ADD COLUMN {column} {definition}")
+    connection.exec_driver_sql(
+        "CREATE INDEX IF NOT EXISTS ix_eventraw_owner_visibility "
+        f"ON {table_name}(owner_user_id, visibility, ts)"
+    )
+
+
 DESKTOP_MIGRATIONS: list[DesktopMigration] = [
     ("001_add_derivedmemory_user_id", _migration_001_add_derivedmemory_user_id),
     ("002_backfill_auth_identities", _migration_002_backfill_auth_identities),
     ("003_newsletter_curation_tables", _migration_003_newsletter_curation_tables),
     ("004_intelligence_feed", _migration_004_intelligence_feed),
+    ("005_event_ownership", _migration_005_event_ownership),
 ]
 
 
@@ -162,25 +206,6 @@ def _run_desktop_migrations(engine: Engine) -> None:
 def check_database_ready() -> None:
     with get_engine().connect() as connection:
         connection.execute(text("SELECT 1"))
-
-
-def check_server_schema_ready() -> None:
-    engine = get_engine()
-    if settings.APP_MODE != AppMode.SERVER:
-        return
-    if ApplicationSchema.__tablename__ not in inspect(engine).get_table_names():
-        raise RuntimeError(
-            "Server database schema is not initialized. "
-            "Run: python scripts/dev/database.py initialize"
-        )
-    with session_scope() as session:
-        state = session.get(ApplicationSchema, 1)
-    if state is None or state.version != SERVER_SCHEMA_VERSION:
-        actual = "missing" if state is None else str(state.version)
-        raise RuntimeError(
-            f"Server database schema version is {actual}; expected {SERVER_SCHEMA_VERSION}. "
-            "This pre-release build requires a manual database refresh."
-        )
 
 
 def server_schema_tables():

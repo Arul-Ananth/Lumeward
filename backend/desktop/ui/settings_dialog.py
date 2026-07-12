@@ -24,6 +24,7 @@ from backend.desktop.preferences import (
     get_clipboard_collection_enabled,
     get_clipboard_store_raw_text_enabled,
     get_data_collection_enabled,
+    get_enterprise_server_url,
     get_llm_base_url,
     get_llm_model_name,
     get_llm_provider,
@@ -31,6 +32,7 @@ from backend.desktop.preferences import (
     set_clipboard_collection_enabled,
     set_clipboard_store_raw_text_enabled,
     set_data_collection_enabled,
+    set_enterprise_server_url,
     set_llm_base_url,
     set_llm_model_name,
     set_llm_provider,
@@ -104,6 +106,14 @@ class SettingsDialog(QDialog):
         llm_layout.addRow("Model", self.model_input)
         content_layout.addWidget(llm_group)
 
+        enterprise_group = QGroupBox("Enterprise")
+        enterprise_layout = QFormLayout(enterprise_group)
+        self.enterprise_server_url_input = _line_input(get_enterprise_server_url())
+        self.enterprise_server_url_input.setPlaceholderText("https://lumeward.company.example")
+        enterprise_layout.addRow("Server URL", self.enterprise_server_url_input)
+        enterprise_layout.addRow(QLabel("Restart Lumeward after changing the server URL."))
+        content_layout.addWidget(enterprise_group)
+
         api_group, api_layout = _group("API Keys")
         api_layout.addWidget(QLabel("OpenAI API Key"))
         self.openai_input = _secret_input("openai_api_key")
@@ -165,10 +175,12 @@ class SettingsDialog(QDialog):
         provider = str(self.provider_input.currentData())
         base_url = self.base_url_input.text().strip()
         model_name = self.model_input.text().strip()
+        enterprise_server_url = self.enterprise_server_url_input.text().strip()
 
         set_llm_provider(provider)
         set_llm_base_url(base_url)
         set_llm_model_name(model_name)
+        set_enterprise_server_url(enterprise_server_url)
         apply_llm_preferences_to_settings()
         if openai_key:
             set_secret("openai_api_key", openai_key)

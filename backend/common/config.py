@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     TRUSTED_LAN_USER_EMAIL: str = "local@lan"
     TRUSTED_LAN_USER_NAME: str = "Trusted LAN User"
     AUTH_SESSION_EXPIRE_MINUTES: int = 720
+    ENTERPRISE_SERVER_URL: str = ""
     APP_VERSION: str = APP_VERSION
 
     # AI / External Services
@@ -63,6 +64,11 @@ class Settings(BaseSettings):
     DB_POOL_RECYCLE_SECONDS: int = 1800
     QDRANT_URL: str = ""
     QDRANT_API_KEY: str = ""
+    QDRANT_MODE: str = "external"
+    BUNDLED_QDRANT_BINARY: str = ""
+    BUNDLED_QDRANT_CONFIG_PATH: str = ""
+    BUNDLED_QDRANT_STORAGE_DIR: str = ""
+    BUNDLED_QDRANT_STARTUP_TIMEOUT_SECONDS: int = 30
     QDRANT_TIMEOUT_SECONDS: int = 30
     QDRANT_PREFER_GRPC: bool = False
     INGESTION_CONCURRENCY: int = 2
@@ -124,6 +130,8 @@ class Settings(BaseSettings):
         database_url = self.DATABASE_URL.strip().lower()
         if not database_url.startswith(("postgresql://", "postgresql+psycopg://")):
             raise RuntimeError("Server mode requires DATABASE_URL using PostgreSQL.")
+        if self.QDRANT_MODE not in {"external", "bundled"}:
+            raise RuntimeError("QDRANT_MODE must be external or bundled.")
         if not self.QDRANT_URL.strip():
             raise RuntimeError("Server mode requires QDRANT_URL; embedded Qdrant is desktop-only.")
         if self.SERVER_WORKERS < 1:
@@ -134,6 +142,8 @@ class Settings(BaseSettings):
             raise RuntimeError("Database pool timeouts must be positive.")
         if self.QDRANT_TIMEOUT_SECONDS < 1:
             raise RuntimeError("QDRANT_TIMEOUT_SECONDS must be positive.")
+        if self.BUNDLED_QDRANT_STARTUP_TIMEOUT_SECONDS < 1:
+            raise RuntimeError("BUNDLED_QDRANT_STARTUP_TIMEOUT_SECONDS must be positive.")
         if self.INGESTION_CONCURRENCY < 1:
             raise RuntimeError("INGESTION_CONCURRENCY must be at least 1.")
         qdrant_url = urlparse(self.QDRANT_URL.strip())

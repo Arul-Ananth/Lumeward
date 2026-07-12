@@ -14,6 +14,7 @@ _KEY_LLM_MODEL_NAME = "llm/model_name"
 _KEY_DATA_COLLECTION_ENABLED = "telemetry/data_collection_enabled"
 _KEY_CLIPBOARD_COLLECTION_ENABLED = "telemetry/clipboard_collection_enabled"
 _KEY_CLIPBOARD_STORE_RAW_TEXT = "telemetry/clipboard_store_raw_text"
+_KEY_ENTERPRISE_SERVER_URL = "enterprise/server_url"
 
 _VALID_THEME_MODES = {"system", "dark", "light"}
 _VALID_LLM_PROVIDERS = {"ollama", "openai", "google"}
@@ -117,3 +118,13 @@ def get_clipboard_store_raw_text_enabled() -> bool:
 
 def set_clipboard_store_raw_text_enabled(enabled: bool) -> None:
     _store().setValue(_KEY_CLIPBOARD_STORE_RAW_TEXT, bool(enabled))
+
+
+def get_enterprise_server_url() -> str:
+    raw = _store().value(_KEY_ENTERPRISE_SERVER_URL, settings.ENTERPRISE_SERVER_URL)
+    value = raw if isinstance(raw, str) else str(raw)
+    return value.strip().rstrip("/")
+
+
+def set_enterprise_server_url(url: str) -> None:
+    _store().setValue(_KEY_ENTERPRISE_SERVER_URL, url.strip().rstrip("/"))

@@ -123,6 +123,17 @@ files are cleaned up.
 
 ## Dependency Locking
 
+`pyproject.toml` supports a standard uv-managed development environment:
+
+```powershell
+.\venv_win\Scripts\uv.exe sync
+.\venv_win\Scripts\uv.exe sync --extra desktop
+.\venv_win\Scripts\uv.exe sync --extra packaging
+```
+
+`uv sync` creates and manages `.venv`. The existing `venv_win` remains usable
+with the lock-file workflow below.
+
 Python dependencies use human-edited `.in` files and generated `.lock.txt`
 files. Use the lock files for reproducible installs:
 
@@ -186,7 +197,7 @@ Install packaging dependencies before building executables:
 .\venv_win\Scripts\python.exe -m uv pip sync --torch-backend cpu requirements-packaging.lock.txt
 ```
 
-Beta 1.0 includes a metadata-only `/news/sources` endpoint for planned future source integrations. It does not load plugins, store plugin credentials, or ingest Telegram/WhatsApp/RSS/email data.
+Beta 1.0 stores plugin manifests and independently scoped permission grants as a future-facing foundation. It does not execute plugins or ingest plugin context yet.
 
 ## Startup
 

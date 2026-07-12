@@ -9,6 +9,7 @@ from backend.common.services.auth.providers.interactive import resolve_interacti
 from backend.common.services.auth.providers.trusted_lan import resolve_trusted_lan_context
 from backend.common.services.auth.transports import extract_bearer_token
 from backend.common.services.auth.types import AuthContext, AuthPrincipal
+from backend.common.services.authorization import RequestContext, build_request_context, workspace_header
 
 
 def get_auth_context(
@@ -26,3 +27,12 @@ def get_current_principal(
     if auth_context.principal is None or not auth_context.authenticated:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
     return auth_context.principal
+
+
+def get_request_context(
+    workspace_id: int | None = Depends(workspace_header),
+    auth_context: AuthContext = Depends(get_auth_context),
+    session: Session = Depends(get_session),
+) -> RequestContext:
+    principal = get_current_principal(auth_context)
+    return build_request_context(session, principal, workspace_id)

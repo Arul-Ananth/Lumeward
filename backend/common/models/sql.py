@@ -12,6 +12,90 @@ class User(SQLModel, table=True):
     hashed_password: str
 
 
+class Organization(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("slug", name="uq_organization_slug"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(max_length=160)
+    slug: str = Field(index=True, max_length=120)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Workspace(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("organization_id", "slug", name="uq_workspace_org_slug"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
+    name: str = Field(max_length=160)
+    slug: str = Field(index=True, max_length=120)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class OrganizationMembership(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("organization_id", "user_id", name="uq_org_membership"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    role: str = Field(default="member", max_length=64)
+    is_active: bool = Field(default=True, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class WorkspaceMembership(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("workspace_id", "user_id", name="uq_workspace_membership"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: int = Field(foreign_key="workspace.id", index=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    role: str = Field(default="member", max_length=64)
+    is_active: bool = Field(default=True, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class Tag(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("organization_id", "normalized_key", name="uq_tag_org_key"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int | None = Field(default=None, foreign_key="organization.id", index=True)
+    normalized_key: str = Field(index=True, max_length=120)
+    display_name: str = Field(max_length=160)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ContextTag(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("event_id", "tag_id", name="uq_context_tag"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: int = Field(foreign_key="eventraw.id", index=True)
+    tag_id: int = Field(foreign_key="tag.id", index=True)
+    origin: str = Field(default="manual", max_length=32)
+    confidence: float | None = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class UserTagPreference(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("user_id", "tag_id", name="uq_user_tag_preference"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    tag_id: int = Field(foreign_key="tag.id", index=True)
+    weight: float = Field(default=1.0)
+    muted: bool = Field(default=False, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class WorkspaceTagPolicy(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("workspace_id", "tag_id", name="uq_workspace_tag_policy"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    workspace_id: int = Field(foreign_key="workspace.id", index=True)
+    tag_id: int = Field(foreign_key="tag.id", index=True)
+    priority: float = Field(default=0.0)
+    blocked: bool = Field(default=False, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class AuthIdentity(SQLModel, table=True):
     __table_args__ = (UniqueConstraint("provider", "subject", name="uq_authidentity_provider_subject"),)
 
@@ -114,6 +198,7 @@ class EventRaw(SQLModel, table=True):
     __table_args__ = (
         Index("ix_eventraw_session_ts", "session_id", "ts"),
         Index("ix_eventraw_hash_ts", "hash", "ts"),
+        Index("ix_eventraw_owner_visibility", "owner_user_id", "visibility", "ts"),
     )
     id: Optional[int] = Field(default=None, primary_key=True)
     event_type: str = Field(index=True, max_length=80)
@@ -122,6 +207,67 @@ class EventRaw(SQLModel, table=True):
     payload_json: str = Field(sa_type=Text)
     hash: str = Field(index=True, max_length=64)
     source: str = Field(max_length=80)
+    organization_id: str | None = Field(default=None, index=True, max_length=128)
+    workspace_id: str | None = Field(default=None, index=True, max_length=128)
+    owner_user_id: int | None = Field(default=None, index=True, foreign_key="user.id")
+    visibility: str = Field(default="private", index=True, max_length=32)
+
+
+class RetentionPolicy(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int | None = Field(default=None, foreign_key="organization.id", index=True)
+    name: str = Field(max_length=120)
+    retention_days: int | None = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ContextItem(SQLModel, table=True):
+    __table_args__ = (
+        UniqueConstraint("event_id", name="uq_context_item_event"),
+        Index("ix_contextitem_scope_created", "organization_id", "workspace_id", "visibility", "created_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    event_id: int | None = Field(default=None, foreign_key="eventraw.id", index=True)
+    organization_id: str | None = Field(default=None, index=True, max_length=128)
+    workspace_id: str | None = Field(default=None, index=True, max_length=128)
+    owner_user_id: int | None = Field(default=None, foreign_key="user.id", index=True)
+    visibility: str = Field(default="private", index=True, max_length=32)
+    source: str = Field(max_length=80)
+    external_id: str | None = Field(default=None, max_length=512)
+    content_type: str = Field(default="text", max_length=64)
+    classification: str = Field(default="internal", max_length=64)
+    processing_purpose: str = Field(default="context_retrieval", max_length=120)
+    retention_policy_id: int | None = Field(default=None, foreign_key="retentionpolicy.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    deleted_at: datetime | None = Field(default=None, index=True)
+
+
+class PluginInstallation(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("organization_id", "plugin_key", "workspace_id", name="uq_plugin_installation_scope"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
+    workspace_id: int | None = Field(default=None, foreign_key="workspace.id", index=True)
+    plugin_key: str = Field(max_length=120, index=True)
+    version: str = Field(max_length=64)
+    manifest_json: str = Field(sa_type=Text)
+    status: str = Field(default="enabled", max_length=32, index=True)
+    installed_by_user_id: int = Field(foreign_key="user.id", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class PluginGrant(SQLModel, table=True):
+    __table_args__ = (UniqueConstraint("installation_id", "capability", "target", name="uq_plugin_grant"),)
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    installation_id: int = Field(foreign_key="plugininstallation.id", index=True)
+    capability: str = Field(max_length=120)
+    target: str = Field(max_length=512)
+    granted_by_user_id: int = Field(foreign_key="user.id", index=True)
+    active: bool = Field(default=True, index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class FilesIndex(SQLModel, table=True):
@@ -155,9 +301,3 @@ class SchemaMigration(SQLModel, table=True):
     __table_args__ = {"info": {"desktop_only": True}}
     migration_id: str = Field(primary_key=True, max_length=128)
     applied_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-class ApplicationSchema(SQLModel, table=True):
-    id: int = Field(default=1, primary_key=True)
-    version: int
-    updated_at: datetime = Field(default_factory=datetime.utcnow)

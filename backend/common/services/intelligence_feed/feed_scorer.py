@@ -38,7 +38,7 @@ class FeedScorer:
         tokens = set(re.findall(r"[a-z0-9_+-]+", lowered))
         muted = bool(tokens.intersection(MUTED_KEYWORDS))
 
-        topics: list[str] = []
+        topics: list[str] = list(event.tags)
         for keyword, labels in BOOSTED_KEYWORDS.items():
             if keyword in lowered:
                 for label in labels:

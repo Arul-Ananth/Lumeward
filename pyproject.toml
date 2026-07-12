@@ -1,0 +1,72 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lumeward"
+version = "1.0.0-beta.1"
+description = "Local and enterprise intelligence workspace"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "argon2-cffi",
+    "crewai[google-genai]==1.15.2",
+    "cryptography<49",
+    "email-validator",
+    "fastapi==0.139.0",
+    "google-genai<2",
+    "litellm==1.92.0",
+    "opencv-python-headless<5",
+    "passlib",
+    "protobuf<7",
+    "psycopg[binary]",
+    "pydantic==2.12.5",
+    "pydantic-settings==2.10.1",
+    "python-multipart==0.0.32",
+    "qdrant-client",
+    "requests",
+    "sentence-transformers",
+    "sqlmodel==0.0.39",
+    "uvicorn==0.51.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
+desktop = [
+    "PySide6",
+    "Pillow==12.3.0",
+    "ddgs",
+    "easyocr",
+    "keyring",
+    "lxml",
+    "pypdf==6.14.2",
+    "python-docx",
+    "qasync",
+    "qt-material",
+    "trafilatura",
+    "watchdog",
+]
+packaging = [
+    "PyInstaller==6.21.0",
+    "PySide6",
+    "Pillow==12.3.0",
+    "ddgs",
+    "easyocr",
+    "keyring",
+    "lxml",
+    "pypdf==6.14.2",
+    "python-docx",
+    "qasync",
+    "qt-material",
+    "trafilatura",
+    "watchdog",
+]
+
+[project.scripts]
+lumeward = "backend.main:main"
+
+[tool.setuptools.packages.find]
+include = ["backend*"]

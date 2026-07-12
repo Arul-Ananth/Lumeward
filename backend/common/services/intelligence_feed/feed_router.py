@@ -22,9 +22,23 @@ class IntelligenceFeedRouter:
         self.deduper = FeedDeduper()
         self.triage = FeedTriage()
 
-    def process_new_events(self, session: Session, user_id: int, *, limit: int = 20) -> int:
+    def process_new_events(
+        self,
+        session: Session,
+        user_id: int,
+        *,
+        workspace_ids: tuple[int, ...] = (),
+        organization_ids: tuple[int, ...] = (),
+        limit: int = 20,
+    ) -> int:
         created = 0
-        for event in load_unprocessed_events(session, user_id, limit=limit):
+        for event in load_unprocessed_events(
+            session,
+            user_id,
+            workspace_ids=workspace_ids,
+            organization_ids=organization_ids,
+            limit=limit,
+        ):
             try:
                 score = self.scorer.score(event)
                 if score.muted or self.deduper.is_duplicate(session, event, score.topic_key):

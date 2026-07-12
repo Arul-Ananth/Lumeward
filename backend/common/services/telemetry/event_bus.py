@@ -25,6 +25,10 @@ class TelemetryEvent:
     priority: EventPriority
     ts: datetime = field(default_factory=datetime.utcnow)
     content_hash: str = ""
+    organization_id: str | None = None
+    workspace_id: str | None = None
+    owner_user_id: int | None = None
+    visibility: str = "private"
 
 
 class EventBus:

@@ -8,6 +8,7 @@ from sqlmodel import Session
 
 from backend.common.database import get_engine
 from backend.common.security.policy import InputSanitizer
+from backend.desktop.services.enterprise_client import EnterpriseClient
 
 logger = logging.getLogger(__name__)
 _sanitizer = InputSanitizer()
@@ -26,6 +27,7 @@ class AIWorker(QThread):
         user_id: int,
         session_id: str,
         api_keys: dict[str, str | None],
+        enterprise_client: EnterpriseClient | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -34,6 +36,7 @@ class AIWorker(QThread):
         self.user_id = user_id
         self.session_id = session_id
         self.api_keys = api_keys
+        self.enterprise_client = enterprise_client
         self._cancelled = False
 
     def cancel(self) -> None:
@@ -47,6 +50,10 @@ class AIWorker(QThread):
             return
 
         try:
+            if self.enterprise_client is not None:
+                self.status_message.emit("Sending request to enterprise workspace...")
+                self.result_ready.emit(self.enterprise_client.generate(self.topic, self.context))
+                return
             from backend.common.services.newsletter.pipeline import GenerationRequest, newsletter_pipeline
 
             self.status_message.emit("Starting AI generation...")

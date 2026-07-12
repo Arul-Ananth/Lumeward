@@ -16,6 +16,7 @@ from backend.common.models.sql import DerivedMemory, EventRaw, FilesIndex
 from backend.common.services.telemetry.event_bus import EventBus, TelemetryEvent
 from backend.common.services.telemetry.ingestion import file_sha256
 from backend.common.services.ingestion.document_service import document_ingestion
+from backend.common.services.context_items import create_context_item
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +73,14 @@ class TelemetryDispatcher(_AsyncQueueWorker):
                 payload_json=json.dumps(event.payload),
                 hash=content_hash,
                 source=event.source,
+                organization_id=event.organization_id,
+                workspace_id=event.workspace_id,
+                owner_user_id=event.owner_user_id or _payload_user_id(event.payload),
+                visibility=event.visibility,
             )
             session.add(raw)
+            session.flush()
+            create_context_item(session, raw)
             session.commit()
 
         self._writes += 1
@@ -230,6 +237,11 @@ def _coerce_user_id(value) -> int:
         return int(value)
     except (TypeError, ValueError):
         return -1
+
+
+def _payload_user_id(payload: dict) -> int | None:
+    value = _coerce_user_id(payload.get("user_id"))
+    return value if value > 0 else None
 
 
 def _is_duplicate(session: Session, content_hash: str) -> bool:

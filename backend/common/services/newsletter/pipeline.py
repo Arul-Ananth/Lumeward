@@ -51,6 +51,8 @@ class GenerationRequest:
     session_id: str | None = None
     source_schedule_id: int | None = None
     persist: bool = True
+    workspace_ids: tuple[int, ...] = ()
+    organization_ids: tuple[int, ...] = ()
 
 
 def sync_builtin_templates(session: Session) -> None:
@@ -155,6 +157,8 @@ class NewsletterPipeline:
             template_key=request.template_key,
             source_schedule_id=request.source_schedule_id,
             persist=request.persist,
+            workspace_ids=request.workspace_ids,
+            organization_ids=request.organization_ids,
         )
 
     async def generate_newsletter(
@@ -169,6 +173,8 @@ class NewsletterPipeline:
         template_key: str | None = None,
         source_schedule_id: int | None = None,
         persist: bool = True,
+        workspace_ids: tuple[int, ...] = (),
+        organization_ids: tuple[int, ...] = (),
     ) -> NewsResponse:
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
@@ -180,6 +186,8 @@ class NewsletterPipeline:
             api_keys or {},
             session_id,
             template_key,
+            workspace_ids,
+            organization_ids,
         )
         markdown = result["markdown"]
         if session is not None and persist:
@@ -205,10 +213,12 @@ class NewsletterPipeline:
         api_keys: dict,
         session_id: str | None,
         template_key: str | None,
+        workspace_ids: tuple[int, ...],
+        organization_ids: tuple[int, ...],
     ) -> dict:
         now = datetime.now().astimezone()
         template = get_template(template_key)
-        body = self._build_body(topic, user_id, context, api_keys, session_id, template, now)
+        body = self._build_body(topic, user_id, context, api_keys, session_id, template, now, workspace_ids, organization_ids)
         title = title_for_digest(template=template, topic=topic, now=now)
         markdown = compile_markdown(title=title, topic=topic, template=template, body=body, runtime_date=now)
         return {
@@ -227,6 +237,8 @@ class NewsletterPipeline:
         session_id: str | None,
         template: NewsletterTemplateDefinition,
         now: datetime,
+        workspace_ids: tuple[int, ...] = (),
+        organization_ids: tuple[int, ...] = (),
     ) -> str:
         clipboard_query = is_clipboard_history_query(topic)
         time_sensitive = _is_time_sensitive_query(topic)
@@ -234,7 +246,13 @@ class NewsletterPipeline:
         date_only_query = _needs_current_date(topic) and not current_events_query and not clipboard_query
         tools = [] if clipboard_query else build_search_tools(api_keys=api_keys)
 
-        memory_context = get_memory_context(user_id=user_id, topic=topic, session_id=session_id)
+        memory_context = get_memory_context(
+            user_id=user_id,
+            topic=topic,
+            session_id=session_id,
+            workspace_ids=workspace_ids,
+            organization_ids=organization_ids,
+        )
         clipboard_context = get_recent_clipboard_context(topic=topic, session_id=session_id)
         safe_memory = sanitize_memory_context(memory_context) if memory_context else ""
         combined_context = self._combined_context(

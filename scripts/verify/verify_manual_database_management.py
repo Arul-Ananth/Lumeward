@@ -11,11 +11,10 @@ from sqlmodel import select
 
 from backend.common.config import AppMode, settings
 from backend.common.database import (
-    check_server_schema_ready,
     reset_database_runtime,
     session_scope,
 )
-from backend.common.models.sql import ApplicationSchema, User
+from backend.common.models.sql import User
 from scripts.dev import database
 
 
@@ -34,20 +33,14 @@ def main() -> int:
             reset_database_runtime()
 
             database.initialize()
-            check_server_schema_ready()
             with session_scope() as session:
                 session.add(User(email="remove@example.com", full_name="Remove", hashed_password="hash"))
                 session.commit()
 
             database.refresh(include_qdrant=False)
-            check_server_schema_ready()
             with session_scope() as session:
                 if session.exec(select(User)).first() is not None:
                     print("FAIL: relational refresh did not remove existing data.")
-                    return 1
-                state = session.get(ApplicationSchema, 1)
-                if state is None or state.version != database.SERVER_SCHEMA_VERSION:
-                    print("FAIL: refreshed schema version was not recorded.")
                     return 1
 
             try:
@@ -58,7 +51,7 @@ def main() -> int:
                 print("FAIL: initialize accepted an existing application schema.")
                 return 1
 
-        print("PASS: explicit initialize, version validation, and destructive refresh verified.")
+        print("PASS: explicit initialize and destructive refresh verified.")
         return 0
     finally:
         reset_database_runtime()

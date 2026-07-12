@@ -13,6 +13,7 @@ from backend.common.models.sql import EventRaw, FilesIndex
 from backend.common.services.memory.point_ids import stable_point_id
 from backend.common.services.memory.vector_db import client, ensure_collection, get_embedder
 from backend.common.services.telemetry.ingestion import chunk_text, extract_text_from_file, file_sha256
+from backend.common.services.context_items import create_context_item
 
 
 class DocumentIngestionService:
@@ -27,6 +28,9 @@ class DocumentIngestionService:
         session_id: str,
         batch_id: str = "",
         source: str = "file_ingestion",
+        organization_id: str | None = None,
+        workspace_id: str | None = None,
+        visibility: str = "private",
         ensure_collection_fn=None,
         embedder_fn=None,
         qdrant_client=None,
@@ -61,6 +65,9 @@ class DocumentIngestionService:
                     payload={
                         "document": chunks[index],
                         "user_id": str(user_id),
+                        "organization_id": organization_id,
+                        "workspace_id": workspace_id,
+                        "visibility": visibility,
                         "path": str(path),
                         "chunk_index": index,
                         "upload_batch_id": batch_id,
@@ -78,6 +85,9 @@ class DocumentIngestionService:
                 session_id=session_id,
                 content_hash=content_hash,
                 source=source,
+                organization_id=organization_id,
+                workspace_id=workspace_id,
+                visibility=visibility,
             )
             return "ingested"
         except Exception as exc:
@@ -115,6 +125,9 @@ class DocumentIngestionService:
         session_id: str,
         content_hash: str,
         source: str,
+        organization_id: str | None,
+        workspace_id: str | None,
+        visibility: str,
     ) -> None:
         payload = {
             "path": str(path),
@@ -123,13 +136,20 @@ class DocumentIngestionService:
             "ts": datetime.utcnow().isoformat(),
             "consent": "folder_zip_upload" if source == "folder_upload" else source,
         }
-        session.add(EventRaw(
+        event = EventRaw(
             event_type="file_ingestion",
             session_id=session_id,
             payload_json=json.dumps(payload, ensure_ascii=True),
             hash=hashlib.sha256(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest(),
             source=source,
-        ))
+            organization_id=organization_id,
+            workspace_id=workspace_id,
+            owner_user_id=user_id,
+            visibility=visibility,
+        )
+        session.add(event)
+        session.flush()
+        create_context_item(session, event)
         session.commit()
 
 

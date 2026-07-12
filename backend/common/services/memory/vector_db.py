@@ -137,7 +137,14 @@ def close_qdrant() -> None:
         _client = None
 
 
-def _query_collection(collection: str, user_id: int, query: str, limit: int = 3) -> list[str]:
+def _query_collection(
+    collection: str,
+    user_id: int,
+    query: str,
+    limit: int = 3,
+    workspace_ids: tuple[int, ...] = (),
+    organization_ids: tuple[int, ...] = (),
+) -> list[str]:
     try:
         ensure_collection(collection)
     except _QDRANT_CONNECTION_ERRORS as exc:
@@ -148,14 +155,7 @@ def _query_collection(collection: str, user_id: int, query: str, limit: int = 3)
         results = client.query_points(
             collection_name=collection,
             query=query_vector,
-            query_filter=models.Filter(
-                must=[
-                    models.FieldCondition(
-                        key="user_id",
-                        match=models.MatchValue(value=str(user_id)),
-                    )
-                ]
-            ),
+            query_filter=_scope_filter(user_id, workspace_ids, organization_ids),
             limit=limit,
         ).points
         return [hit.payload.get("document", "") for hit in results if hit.payload.get("document")]
@@ -163,8 +163,15 @@ def _query_collection(collection: str, user_id: int, query: str, limit: int = 3)
         return _handle_qdrant_unavailable("query", collection, exc, [])
 
 
-def get_user_context(user_id: int, topic: str) -> str:
-    documents = _query_collection(settings.QDRANT_COLLECTION_USER_PROFILE, user_id, topic, limit=3)
+def get_user_context(user_id: int, topic: str, workspace_ids: tuple[int, ...] = (), organization_ids: tuple[int, ...] = ()) -> str:
+    documents = _query_collection(
+        settings.QDRANT_COLLECTION_USER_PROFILE,
+        user_id,
+        topic,
+        limit=3,
+        workspace_ids=workspace_ids,
+        organization_ids=organization_ids,
+    )
     return "\n".join(documents) if documents else "No specific preferences found."
 
 
@@ -248,22 +255,46 @@ def _handle_qdrant_unavailable(operation: str, collection: str, exc: Exception, 
     return desktop_fallback
 
 
-def get_memory_context(user_id: int, topic: str, session_id: str | None = None) -> str:
+def get_memory_context(
+    user_id: int,
+    topic: str,
+    session_id: str | None = None,
+    workspace_ids: tuple[int, ...] = (),
+    organization_ids: tuple[int, ...] = (),
+) -> str:
     sections: list[str] = []
 
-    user_docs = _query_collection(settings.QDRANT_COLLECTION_USER_DOCS, user_id, topic, limit=5)
+    user_docs = _query_collection(settings.QDRANT_COLLECTION_USER_DOCS, user_id, topic, limit=5, workspace_ids=workspace_ids, organization_ids=organization_ids)
     if user_docs:
         sections.append("User Documents:\n" + "\n".join(user_docs))
 
-    session_mem = _query_collection(settings.QDRANT_COLLECTION_SESSION_MEMORY, user_id, topic, limit=3)
+    session_mem = _query_collection(settings.QDRANT_COLLECTION_SESSION_MEMORY, user_id, topic, limit=3, workspace_ids=workspace_ids, organization_ids=organization_ids)
     if session_mem:
         sections.append("Session Memory:\n" + "\n".join(session_mem))
 
-    profile = _query_collection(settings.QDRANT_COLLECTION_USER_PROFILE, user_id, topic, limit=3)
+    profile = _query_collection(settings.QDRANT_COLLECTION_USER_PROFILE, user_id, topic, limit=3, workspace_ids=workspace_ids, organization_ids=organization_ids)
     if profile:
         sections.append("User Profile:\n" + "\n".join(profile))
 
     return "\n\n".join(sections).strip()
+
+
+def _scope_filter(user_id: int, workspace_ids: tuple[int, ...], organization_ids: tuple[int, ...]):
+    scopes = [models.Filter(
+        must=[models.FieldCondition(key="user_id", match=models.MatchValue(value=str(user_id)))],
+        must_not=[models.FieldCondition(key="visibility", match=models.MatchAny(any=["workspace", "organization"]))],
+    )]
+    if workspace_ids:
+        scopes.append(models.Filter(must=[
+            models.FieldCondition(key="workspace_id", match=models.MatchAny(any=[str(value) for value in workspace_ids])),
+            models.FieldCondition(key="visibility", match=models.MatchValue(value="workspace")),
+        ]))
+    if organization_ids:
+        scopes.append(models.Filter(must=[
+            models.FieldCondition(key="organization_id", match=models.MatchAny(any=[str(value) for value in organization_ids])),
+            models.FieldCondition(key="visibility", match=models.MatchValue(value="organization")),
+        ]))
+    return models.Filter(should=scopes)
 
 
 def is_clipboard_history_query(topic: str) -> bool:

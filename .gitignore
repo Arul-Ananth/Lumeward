@@ -93,6 +93,8 @@ data/
 .runtime_verify/
 qdrant_db_local/
 qdrant_data/
+tools/qdrant/storage/
+tools/qdrant/.qdrant-initialized
 backend/lumeward_server.db
 backend/chroma_db_local/
 backend/qdrant_db_local/

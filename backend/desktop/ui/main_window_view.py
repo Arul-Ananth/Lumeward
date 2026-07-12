@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QComboBox,
     QPushButton,
     QScrollArea,
     QSplitter,
@@ -50,6 +51,7 @@ class MainWindowWidgets:
     log_widget: CollapsibleLogWidget
     feed_panel: IntelligenceFeedPanel
     preset_buttons: dict[str, QPushButton]
+    workspace_selector: QComboBox
 
 
 def _build_section(title: str) -> tuple[QGroupBox, QVBoxLayout]:
@@ -89,6 +91,10 @@ def build_main_window_content() -> MainWindowWidgets:
     root_layout.setContentsMargins(14, 14, 14, 14)
 
     ask_box, ask_layout = _build_section("Lumeward")
+    workspace_selector = QComboBox()
+    workspace_selector.setMinimumWidth(220)
+    workspace_selector.addItem("Personal workspace", None)
+    ask_layout.addWidget(workspace_selector)
     topic_input = QLineEdit()
     topic_input.setPlaceholderText("Search / Ask Lumeward...")
     generate_btn = QPushButton("Generate Brief")
@@ -191,4 +197,5 @@ def build_main_window_content() -> MainWindowWidgets:
         log_widget=log_widget,
         feed_panel=feed_panel,
         preset_buttons=preset_buttons,
+        workspace_selector=workspace_selector,
     )

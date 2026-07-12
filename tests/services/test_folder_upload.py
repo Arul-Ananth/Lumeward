@@ -6,7 +6,7 @@ import zipfile
 from sqlmodel import Session, select
 
 from backend.common.database import get_engine
-from backend.common.models.sql import EventRaw, FilesIndex, User
+from backend.common.models.sql import ContextItem, EventRaw, FilesIndex, User
 from backend.common.services.ingestion import folder_upload
 from backend.common.services.ingestion.folder_upload import cleanup_managed_uploads_on_startup, ingest_folder_zip
 
@@ -36,6 +36,7 @@ def test_ingest_folder_zip_indexes_text_files_without_network(monkeypatch, isola
         assert client.points
         assert session.exec(select(FilesIndex)).one().status == "ingested"
         assert session.exec(select(EventRaw).where(EventRaw.event_type == "file_ingestion")).one()
+        assert session.exec(select(ContextItem)).one().visibility == "private"
 
 
 def test_ingest_folder_zip_rejects_unsafe_paths(monkeypatch, isolated_data_dir, fake_embedder, fake_qdrant) -> None:

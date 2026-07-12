@@ -36,9 +36,100 @@ class SignupResponse(StrictBaseModel):
     auth_provider: str
 
 
+class WorkspaceResponse(StrictBaseModel):
+    id: int
+    organization_id: int
+    name: str
+    slug: str
+    role: str
+
+
+class OrganizationCreate(StrictBaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    slug: str = Field(min_length=1, max_length=120, pattern=r"^[a-z0-9][a-z0-9-]*$")
+
+
+class OrganizationResponse(StrictBaseModel):
+    id: int
+    name: str
+    slug: str
+
+
+class WorkspaceCreate(StrictBaseModel):
+    organization_id: int
+    name: str = Field(min_length=1, max_length=160)
+    slug: str = Field(min_length=1, max_length=120, pattern=r"^[a-z0-9][a-z0-9-]*$")
+
+
+class WorkspaceMemberCreate(StrictBaseModel):
+    email: EmailStr
+    role: str = Field(default="member", min_length=1, max_length=64)
+
+
+class TagResponse(StrictBaseModel):
+    id: int
+    organization_id: int | None
+    normalized_key: str
+    display_name: str
+
+
+class TagCreate(StrictBaseModel):
+    organization_id: int
+    display_name: str = Field(min_length=1, max_length=160)
+
+
+class TagPreferenceUpdate(StrictBaseModel):
+    weight: float = Field(default=1.0, ge=-1.0, le=1.0)
+    muted: bool = False
+
+
+class WorkspaceTagPolicyUpdate(StrictBaseModel):
+    priority: float = Field(default=0.0, ge=-1.0, le=1.0)
+    blocked: bool = False
+
+
+class PluginManifestRequest(StrictBaseModel):
+    plugin_key: str = Field(min_length=1, max_length=120, pattern=r"^[a-z0-9][a-z0-9._-]*$")
+    version: str = Field(min_length=1, max_length=64)
+    requested_capabilities: list[str] = Field(default_factory=list, max_length=20)
+    allowed_network_origins: list[str] = Field(default_factory=list, max_length=20)
+    context_types: list[str] = Field(default_factory=list, max_length=20)
+
+
+class PluginInstallRequest(StrictBaseModel):
+    organization_id: int
+    workspace_id: int | None = None
+    manifest: PluginManifestRequest
+
+
+class PluginGrantRequest(StrictBaseModel):
+    capability: str = Field(min_length=1, max_length=120)
+    target: str = Field(min_length=1, max_length=512)
+
+
+class PluginInstallationResponse(StrictBaseModel):
+    id: int
+    organization_id: int
+    workspace_id: int | None
+    plugin_key: str
+    version: str
+    status: str
+
+
 class NewsRequest(StrictBaseModel):
     topic: str = Field(min_length=1, max_length=255)
     template_key: str | None = Field(default=None, min_length=1, max_length=80)
+    context: str = Field(default="", max_length=10000)
+
+
+class ContextIngestRequest(StrictBaseModel):
+    text: str = Field(min_length=1, max_length=100000)
+    source: str = Field(min_length=1, max_length=80, pattern=r"^[a-z0-9._-]+$")
+    title: str = Field(default="", max_length=255)
+
+
+class ContextIngestResponse(StrictBaseModel):
+    chunks_indexed: int
 
 
 class NewsResponse(StrictBaseModel):

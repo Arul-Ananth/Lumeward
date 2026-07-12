@@ -26,13 +26,18 @@ from backend.common.models.schemas import (
     NewsletterSourceCapabilityResponse,
     NewsletterTemplateResponse,
     ProfileResponse,
+    ContextIngestRequest,
+    ContextIngestResponse,
 )
 from backend.common.services.intelligence_feed.feed_deep_dive import run_deep_dive
 from backend.common.services.intelligence_feed.feed_router import IntelligenceFeedRouter
 from backend.common.services.ingestion import ingest_folder_zip
 from backend.common.services.ingestion.folder_upload import upload_root
+from backend.common.services.ingestion.text_context import ingest_workspace_text
 from backend.common.services.auth.resolver import get_current_principal
+from backend.common.services.auth.resolver import get_request_context
 from backend.common.services.auth.types import AuthPrincipal
+from backend.common.services.authorization import RequestContext
 from backend.common.services.memory import vector_db
 from backend.common.services.memory.vector_db import QdrantUnavailableError
 from backend.common.services.newsletter.pipeline import (
@@ -54,6 +59,7 @@ feed_router = IntelligenceFeedRouter()
 ingestion_semaphore = asyncio.Semaphore(max(1, settings.INGESTION_CONCURRENCY))
 UPLOAD_CHUNK_BYTES = 1024 * 1024
 CurrentPrincipal = Annotated[AuthPrincipal, Depends(get_current_principal)]
+CurrentRequestContext = Annotated[RequestContext, Depends(get_request_context)]
 DbSession = Annotated[Session, Depends(get_session)]
 
 
@@ -61,11 +67,19 @@ DbSession = Annotated[Session, Depends(get_session)]
 async def generate_news(
     request: NewsRequest,
     principal: CurrentPrincipal,
+    request_context: CurrentRequestContext,
     session: DbSession,
 ):
-    context = await asyncio.to_thread(vector_db.get_user_context, principal.user_id, request.topic)
+    retrieved_context = await asyncio.to_thread(
+        vector_db.get_memory_context,
+        principal.user_id,
+        request.topic,
+        workspace_ids=request_context.workspace_ids,
+        organization_ids=request_context.organization_ids,
+    )
 
     try:
+        context = "\n\n".join(part for part in (request.context.strip(), str(retrieved_context)) if part)
         result_response = await newsletter_pipeline.generate(
             GenerationRequest(
                 topic=request.topic,
@@ -73,6 +87,8 @@ async def generate_news(
                 source="web",
                 context=str(context),
                 template_key=request.template_key,
+                workspace_ids=request_context.workspace_ids,
+                organization_ids=request_context.organization_ids,
             ),
             session=session,
         )
@@ -89,6 +105,39 @@ async def generate_news(
     )
 
 
+@router.post("/ingest/context", response_model=ContextIngestResponse)
+def ingest_context(
+    request: ContextIngestRequest,
+    principal: CurrentPrincipal,
+    request_context: CurrentRequestContext,
+    session: DbSession,
+):
+    workspace_id = request_context.active_workspace_id
+    if workspace_id is None:
+        raise HTTPException(status_code=400, detail="Select a workspace before sharing context")
+    workspace = next((item for item in request_context.workspace_ids if item == workspace_id), None)
+    if workspace is None:
+        raise HTTPException(status_code=403, detail="Workspace access denied")
+    from backend.common.models.sql import Workspace
+
+    workspace_row = session.get(Workspace, workspace_id)
+    if workspace_row is None:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+    try:
+        chunks = ingest_workspace_text(
+            session,
+            text=request.text,
+            source=request.source,
+            title=request.title,
+            user_id=principal.user_id,
+            organization_id=workspace_row.organization_id,
+            workspace_id=workspace_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return ContextIngestResponse(chunks_indexed=chunks)
+
+
 @router.get("/templates", response_model=list[NewsletterTemplateResponse])
 def get_templates(session: DbSession):
     return list_templates(session)
@@ -102,9 +151,15 @@ def get_sources():
 @router.get("/feed", response_model=list[FeedCardResponse])
 def get_feed(
     principal: CurrentPrincipal,
+    request_context: CurrentRequestContext,
     session: DbSession,
 ):
-    feed_router.process_new_events(session, principal.user_id)
+    feed_router.process_new_events(
+        session,
+        principal.user_id,
+        workspace_ids=request_context.workspace_ids,
+        organization_ids=request_context.organization_ids,
+    )
     return feed_router.list_cards(session, principal.user_id)
 
 

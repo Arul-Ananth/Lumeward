@@ -9,7 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from backend.common.config import settings
 from backend.common.database import (
     check_database_ready,
-    check_server_schema_ready,
     create_db_and_tables,
     dispose_database,
     session_scope,
@@ -24,6 +23,7 @@ from backend.common.services.memory.vector_db import (
 from backend.common.services.auth.store import ensure_trusted_lan_user
 from backend.common.services.ingestion import cleanup_managed_uploads_on_startup
 from backend.server.routers import auth, news
+from backend.server.qdrant_runtime import start_bundled_qdrant, stop_bundled_qdrant
 
 
 @asynccontextmanager
@@ -32,7 +32,7 @@ async def lifespan(_: FastAPI):
     cleanup_managed_uploads_on_startup()
     create_db_and_tables()
     check_database_ready()
-    check_server_schema_ready()
+    start_bundled_qdrant()
     check_qdrant_ready()
     initialize_qdrant_collections()
     if settings.is_trusted_lan_auth():
@@ -42,6 +42,7 @@ async def lifespan(_: FastAPI):
         yield
     finally:
         close_qdrant()
+        stop_bundled_qdrant()
         dispose_database()
 
 

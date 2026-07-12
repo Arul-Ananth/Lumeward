@@ -12,6 +12,8 @@ from backend.common.services.llm.tool_policy import describe_search_mode, resolv
 from backend.desktop.preferences import get_theme_mode
 from backend.desktop.security import get_secret
 from backend.desktop.services.ai_worker import AIWorker
+from backend.desktop.services.enterprise_client import EnterpriseClient
+from backend.desktop.services.enterprise_ingest_worker import EnterpriseIngestWorker
 from backend.desktop.services.ocr_worker import OCRWorker
 from backend.desktop.telemetry_manager import TelemetryManager
 from backend.desktop.theme import apply_app_theme
@@ -41,6 +43,7 @@ class MainWindow(QMainWindow):
         api_stop_event=None,
         bridge_token: str | None = None,
         bridge_warning: str | None = None,
+        enterprise_client: EnterpriseClient | None = None,
     ) -> None:
         super().__init__()
         self.user_id = user_id
@@ -54,6 +57,7 @@ class MainWindow(QMainWindow):
         self._bridge_disabled = False
         self._bridge_deadline = None
         self._ipc_timer: QTimer | None = None
+        self.enterprise_client = enterprise_client
 
         self._ai_worker: AIWorker | None = None
         self._ocr_worker: OCRWorker | None = None
@@ -61,6 +65,7 @@ class MainWindow(QMainWindow):
         self._feed_processor_worker: FeedProcessorWorker | None = None
         self._feed_dismiss_worker: FeedDismissWorker | None = None
         self._feed_deep_dive_worker: FeedDeepDiveWorker | None = None
+        self._enterprise_ingest_workers: list[EnterpriseIngestWorker] = []
         self._context_fragments: list[str] = []
         self._has_result = False
         self._generation_error_pending = False
@@ -93,6 +98,7 @@ class MainWindow(QMainWindow):
         self.ui.feed_panel.dismiss_requested.connect(self.dismiss_feed_card)
         self.ui.feed_panel.deep_dive_requested.connect(self.start_feed_deep_dive)
         self.topic_input.textChanged.connect(self._update_action_states)
+        self._load_enterprise_workspaces()
 
         for label, button in self.ui.preset_buttons.items():
             preset_text = PRESET_GUIDANCE[label]
@@ -113,7 +119,12 @@ class MainWindow(QMainWindow):
         self.hotkey_manager = GlobalHotkeyManager(self.signal_bus)
         self.hotkey_manager.register()
 
-        self.telemetry = TelemetryManager(user_id=user_id, session_id=session_id, output=self.output_area)
+        self.telemetry = TelemetryManager(
+            user_id=user_id,
+            session_id=session_id,
+            output=self.output_area,
+            enterprise_dispatch=self._share_enterprise_context if enterprise_client else None,
+        )
         QTimer.singleShot(0, self.telemetry.start)
 
         if self._api_process is not None:
@@ -152,11 +163,15 @@ class MainWindow(QMainWindow):
             self.show_status("Enter a topic.")
             return
 
+        if self.enterprise_client is not None and self.enterprise_client.workspace_id is None:
+            self.show_status("Select an enterprise workspace before generating a brief.")
+            return
+
         if self._ai_worker and self._ai_worker.isRunning():
             self.show_status("Generation already running.")
             return
 
-        if not self._confirm_ollama_ready():
+        if self.enterprise_client is None and not self._confirm_ollama_ready():
             return
 
         self.telemetry.flush_output_time()
@@ -181,7 +196,10 @@ class MainWindow(QMainWindow):
             grounded=self._is_current_date_grounded(topic),
         )
 
-        self._ai_worker = AIWorker(topic, context, self.user_id, self.session_id, api_keys)
+        self._ai_worker = AIWorker(
+            topic, context, self.user_id, self.session_id, api_keys,
+            enterprise_client=self.enterprise_client,
+        )
         self._ai_worker.progress_update.connect(self.signal_bus.progress_update)
         self._ai_worker.status_message.connect(self.signal_bus.status_message)
         self._ai_worker.result_ready.connect(self.signal_bus.result_ready)
@@ -259,6 +277,8 @@ class MainWindow(QMainWindow):
         self._update_action_states()
 
     def process_feed_events(self) -> None:
+        if self.enterprise_client is not None:
+            return
         if self._feed_processor_worker and self._feed_processor_worker.isRunning():
             return
         self._feed_processor_worker = FeedProcessorWorker(self.user_id, self)
@@ -267,6 +287,9 @@ class MainWindow(QMainWindow):
         self._feed_processor_worker.start()
 
     def refresh_feed(self) -> None:
+        if self.enterprise_client is not None:
+            self.show_status("Enterprise feed is scoped to the selected workspace.")
+            return
         if self._feed_refresh_worker and self._feed_refresh_worker.isRunning():
             return
         self._feed_refresh_worker = FeedRefreshWorker(self.user_id, self)
@@ -343,10 +366,14 @@ class MainWindow(QMainWindow):
         if url:
             self._append_activity(f"Ingestion received: {url}")
             self._append_context("Bridge URL", url)
+            if self.enterprise_client is not None:
+                self._share_enterprise_context(url, "browser_bridge", "Browser URL")
         if text:
             preview = text[:200] + ("..." if len(text) > 200 else "")
             self._append_activity(f"Ingested text preview: {preview}")
             self._append_context("Bridge Text", text)
+            if self.enterprise_client is not None:
+                self._share_enterprise_context(text, "browser_bridge", "Browser text")
 
     def activate_snipper(self) -> None:
         self.overlay.activate()
@@ -439,7 +466,34 @@ class MainWindow(QMainWindow):
         if not event.mimeData().hasUrls():
             return
         paths = [url.toLocalFile() for url in event.mimeData().urls()]
+        if self.enterprise_client is not None:
+            for path in paths:
+                self._share_enterprise_file(path)
+            return
         self.telemetry.handle_file_drop(paths)
+
+    def _share_enterprise_context(self, text: str, source: str, title: str = "") -> None:
+        if self.enterprise_client is None or self.enterprise_client.workspace_id is None:
+            self.show_status("Select an enterprise workspace before sharing context.")
+            return
+        worker = EnterpriseIngestWorker(
+            self.enterprise_client, text=text, source=source, title=title, parent=self,
+        )
+        self._start_enterprise_ingest_worker(worker)
+
+    def _share_enterprise_file(self, path: str) -> None:
+        if self.enterprise_client is None or self.enterprise_client.workspace_id is None:
+            self.show_status("Select an enterprise workspace before sharing context.")
+            return
+        worker = EnterpriseIngestWorker(self.enterprise_client, path=path, source="file_drop", parent=self)
+        self._start_enterprise_ingest_worker(worker)
+
+    def _start_enterprise_ingest_worker(self, worker: EnterpriseIngestWorker) -> None:
+        self._enterprise_ingest_workers.append(worker)
+        worker.completed.connect(self._append_activity)
+        worker.error_message.connect(self.show_status)
+        worker.finished.connect(lambda: self._enterprise_ingest_workers.remove(worker))
+        worker.start()
 
     def closeEvent(self, event) -> None:
         self.telemetry.flush_output_time()
@@ -463,6 +517,7 @@ class MainWindow(QMainWindow):
             self._feed_processor_worker,
             self._feed_dismiss_worker,
             self._feed_deep_dive_worker,
+            *self._enterprise_ingest_workers,
         ):
             if worker and worker.isRunning():
                 worker.wait(2000)
@@ -539,6 +594,8 @@ class MainWindow(QMainWindow):
         }
 
     def _confirm_ollama_ready(self) -> bool:
+        if self.enterprise_client is not None:
+            return True
         if settings.ENGINE_ENABLED or (settings.LLM_PROVIDER or "").strip().lower() != "ollama":
             return True
         if self._ollama_checked:
@@ -612,6 +669,27 @@ class MainWindow(QMainWindow):
         self._append_activity("Settings saved.")
         self._update_runtime_summary()
         self._update_action_states()
+
+    def _load_enterprise_workspaces(self) -> None:
+        if self.enterprise_client is None:
+            self.ui.workspace_selector.hide()
+            return
+        try:
+            workspaces = self.enterprise_client.list_workspaces()
+            self.ui.workspace_selector.clear()
+            for workspace in workspaces:
+                self.ui.workspace_selector.addItem(workspace["name"], workspace["id"])
+            if workspaces:
+                self.enterprise_client.workspace_id = workspaces[0]["id"]
+                self.ui.workspace_selector.setCurrentIndex(0)
+                self.ui.workspace_selector.currentIndexChanged.connect(
+                    lambda index: setattr(self.enterprise_client, "workspace_id", self.ui.workspace_selector.itemData(index))
+                )
+            else:
+                self.ui.workspace_selector.addItem("No workspaces assigned", None)
+            self.show_status("Connected to enterprise server.")
+        except Exception as exc:
+            self.show_status(f"Workspace loading failed: {exc}")
 
     def _update_action_states(self) -> None:
         has_topic = bool(self.topic_input.text().strip())

@@ -1,4 +1,4 @@
-"""Explicit pre-release PostgreSQL schema management."""
+"""Explicit PostgreSQL schema management."""
 from __future__ import annotations
 
 import argparse
@@ -15,22 +15,18 @@ from sqlmodel import SQLModel
 
 from backend.common.config import AppMode, settings
 from backend.common.database import (
-    SERVER_SCHEMA_VERSION,
     check_database_ready,
-    check_server_schema_ready,
     dispose_database,
     get_engine,
     server_schema_tables,
-    session_scope,
 )
-from backend.common.models.sql import ApplicationSchema
 from backend.common.services.memory import vector_db
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Manage the disposable pre-release server schema.")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("status", help="Check PostgreSQL connectivity and schema version.")
+    subparsers.add_parser("status", help="Check PostgreSQL connectivity and table presence.")
     subparsers.add_parser("initialize", help="Create tables in an empty PostgreSQL database.")
     for command in ("refresh", "refresh-all"):
         command_parser = subparsers.add_parser(command, help=f"Destructively run {command}.")
@@ -61,13 +57,13 @@ def _require_confirmation(value: str) -> None:
 def status() -> None:
     check_database_ready()
     tables = set(inspect(get_engine()).get_table_names())
-    if ApplicationSchema.__tablename__ not in tables:
+    application_tables = {table.name for table in server_schema_tables()}
+    if not application_tables.issubset(tables):
         print(f"PostgreSQL connection: OK ({_database_name()})")
         print("Schema: NOT INITIALIZED")
         return
-    check_server_schema_ready()
     print(f"PostgreSQL connection: OK ({_database_name()})")
-    print(f"Schema: READY (version {SERVER_SCHEMA_VERSION})")
+    print("Schema: READY")
 
 
 def initialize() -> None:
@@ -81,8 +77,7 @@ def initialize() -> None:
             "Use refresh with explicit confirmation."
         )
     SQLModel.metadata.create_all(engine, tables=server_schema_tables())
-    _write_schema_version()
-    print(f"Initialized PostgreSQL schema version {SERVER_SCHEMA_VERSION} in {_database_name()!r}.")
+    print(f"Initialized PostgreSQL tables in {_database_name()!r}.")
 
 
 def refresh(*, include_qdrant: bool) -> None:
@@ -90,17 +85,10 @@ def refresh(*, include_qdrant: bool) -> None:
     tables = server_schema_tables()
     SQLModel.metadata.drop_all(engine, tables=tables)
     SQLModel.metadata.create_all(engine, tables=tables)
-    _write_schema_version()
-    print(f"Recreated PostgreSQL schema version {SERVER_SCHEMA_VERSION} in {_database_name()!r}.")
+    print(f"Recreated PostgreSQL tables in {_database_name()!r}.")
     if include_qdrant:
         _refresh_qdrant()
         print("Recreated Lumeward Qdrant collections.")
-
-
-def _write_schema_version() -> None:
-    with session_scope() as session:
-        session.add(ApplicationSchema(id=1, version=SERVER_SCHEMA_VERSION))
-        session.commit()
 
 
 def _refresh_qdrant() -> None:
