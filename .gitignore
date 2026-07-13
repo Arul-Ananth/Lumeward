@@ -52,6 +52,7 @@ frontend/dist/
 frontend/build/
 frontend/out/
 npm-debug.log*
+.npm-cache/
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*

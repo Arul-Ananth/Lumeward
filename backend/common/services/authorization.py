@@ -38,7 +38,7 @@ def build_request_context(
         )
     ).all()
     organization_ids = {int(row.organization_id) for row in org_memberships}
-    roles = {row.role for row in org_memberships}
+    organization_roles = {int(row.organization_id): row.role for row in org_memberships}
     workspace_rows = session.exec(
         select(WorkspaceMembership, Workspace)
         .join(Workspace, Workspace.id == WorkspaceMembership.workspace_id)
@@ -47,18 +47,27 @@ def build_request_context(
             WorkspaceMembership.is_active,
         )
     ).all()
-    workspace_ids = tuple(
-        int(workspace.id)
-        for _membership, workspace in workspace_rows
-        if workspace.id is not None and workspace.organization_id in organization_ids
-    )
-    roles.update(
-        membership.role
+    eligible_workspaces = [
+        (membership, workspace)
         for membership, workspace in workspace_rows
-        if workspace.organization_id in organization_ids
-    )
+        if workspace.id is not None and workspace.organization_id in organization_ids
+    ]
+    workspace_ids = tuple(int(workspace.id) for _membership, workspace in eligible_workspaces)
     if requested_workspace_id is not None and requested_workspace_id not in workspace_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Workspace access denied")
+
+    # Roles must be evaluated for the selected workspace, not accumulated from
+    # every workspace the user can access. Organization-level roles apply only
+    # within the active workspace's organization.
+    roles: set[str] = set()
+    if requested_workspace_id is not None:
+        for membership, workspace in eligible_workspaces:
+            if workspace.id == requested_workspace_id:
+                roles.add(membership.role)
+                organization_role = organization_roles.get(int(workspace.organization_id))
+                if organization_role:
+                    roles.add(organization_role)
+                break
     return RequestContext(
         user_id=principal.user_id,
         organization_ids=tuple(sorted(organization_ids)),

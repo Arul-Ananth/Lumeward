@@ -29,7 +29,7 @@ export default defineConfig({
         port: 5173,
         strictPort: true,
         watch: {
-            ignored: ['**/newsroom.db', '**/newsroom.db-journal', '**/qdrant_data/**'],
+            ignored: ['**/lumeward.db', '**/lumeward.db-journal', '**/qdrant_data/**'],
         },
     },
 });

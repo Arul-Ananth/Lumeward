@@ -9,6 +9,7 @@ from backend.common.services.authorization import (
     build_request_context,
     create_organization_for_user,
     create_workspace,
+    require_workspace_role,
 )
 from backend.common.services.tags import create_tag, set_user_tag_preference, set_workspace_tag_policy
 from backend.common.models.schemas import PluginManifestRequest
@@ -80,6 +81,45 @@ def test_request_context_rejects_non_member_workspace(isolated_data_dir) -> None
         )
         with pytest.raises(HTTPException) as error:
             build_request_context(session, principal, workspace.id)
+        assert error.value.status_code == 403
+
+
+def test_workspace_role_does_not_leak_from_another_workspace(isolated_data_dir) -> None:
+    with Session(get_engine()) as session:
+        user = User(email="roles@example.com", full_name="Roles", hashed_password="disabled")
+        organization = Organization(name="Roles Org", slug="roles-org")
+        session.add_all([user, organization])
+        session.commit()
+        session.refresh(user)
+        session.refresh(organization)
+        admin_workspace = Workspace(organization_id=organization.id, name="Admin", slug="admin")
+        member_workspace = Workspace(organization_id=organization.id, name="Member", slug="member")
+        session.add_all([admin_workspace, member_workspace])
+        session.commit()
+        session.refresh(admin_workspace)
+        session.refresh(member_workspace)
+        session.add_all([
+            OrganizationMembership(organization_id=organization.id, user_id=user.id, role="member"),
+            WorkspaceMembership(workspace_id=admin_workspace.id, user_id=user.id, role="workspace_admin"),
+            WorkspaceMembership(workspace_id=member_workspace.id, user_id=user.id, role="member"),
+        ])
+        session.commit()
+        principal = AuthPrincipal(
+            user_id=user.id,
+            identity_id=1,
+            provider="test",
+            subject="roles@example.com",
+            auth_mode="interactive",
+            transport="test",
+            user=user,
+        )
+
+        admin_context = build_request_context(session, principal, admin_workspace.id)
+        require_workspace_role(admin_context, "workspace_admin")
+
+        member_context = build_request_context(session, principal, member_workspace.id)
+        with pytest.raises(HTTPException) as error:
+            require_workspace_role(member_context, "workspace_admin")
         assert error.value.status_code == 403
 
 
