@@ -29,6 +29,30 @@ export interface FolderIngestResponse {
     message: string;
 }
 
+export interface Workspace {
+    id: number;
+    organization_id: number;
+    name: string;
+    slug: string;
+    role: 'member' | 'workspace_admin';
+    organization_role: 'member' | 'organization_admin';
+}
+
+export interface Tag {
+    id: number;
+    organization_id: number;
+    normalized_key: string;
+    display_name: string;
+}
+
+export interface FeedCard {
+    id: number;
+    title: string;
+    bullets: string[];
+    topics: string[];
+    priority_score: number;
+}
+
 interface RawMemoryRecord {
     id: string | number;
     document: string;
@@ -49,6 +73,41 @@ function normalizeMemory(item: RawMemoryRecord, index: number): MemoryRecord {
 }
 
 export const api = {
+    listWorkspaces: () => apiRequest<Workspace[]>('/auth/workspaces'),
+
+    createOrganization: (name: string, slug: string) => apiRequest<{ id: number }>('/auth/organizations', {
+        method: 'POST', body: { name, slug },
+    }),
+
+    createWorkspace: (organizationId: number, name: string, slug: string) => apiRequest<Workspace>('/auth/workspaces', {
+        method: 'POST', body: { organization_id: organizationId, name, slug },
+    }),
+
+    addMember: async (workspace: Workspace, email: string): Promise<void> => {
+        await apiRequest(`/auth/organizations/${workspace.organization_id}/members`, {
+            method: 'POST', body: { email, role: 'member' },
+        });
+        await apiRequest(`/auth/workspaces/${workspace.id}/members`, {
+            method: 'POST', body: { email, role: 'member' },
+        });
+    },
+
+    listTags: (workspaceId: number) => apiRequest<Tag[]>(`/auth/workspaces/${workspaceId}/tags`),
+
+    createTag: (organizationId: number, displayName: string) => apiRequest<Tag>('/auth/tags', {
+        method: 'POST', body: { organization_id: organizationId, display_name: displayName },
+    }),
+
+    setTagPreference: (tagId: number, weight: number, muted: boolean) => apiRequest(`/auth/tags/${tagId}/preference`, {
+        method: 'PUT', body: { weight, muted },
+    }),
+
+    shareContext: (text: string, title: string, tagIds: number[]) => apiRequest<{ chunks_indexed: number }>('/news/ingest/context', {
+        method: 'POST', body: { text, title, tag_ids: tagIds, source: 'web' },
+    }),
+
+    getFeed: () => apiRequest<FeedCard[]>('/news/feed'),
+
     generateBriefing: async (topic: string): Promise<NewsletterResponse> => {
         return apiRequest<NewsletterResponse>('/news/generate', {
             method: 'POST',

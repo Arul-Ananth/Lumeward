@@ -44,4 +44,5 @@ The frontend supports Lumeward's server authentication modes. Trusted-LAN mode
 uses the server's shared trusted identity and must only be exposed on a trusted
 network. Interactive mode uses the sign-up, sign-in, session-status, and logout
 routes provided by the backend. Workspace-aware requests must send the selected
-`X-Workspace-ID` header.
+`X-Workspace-ID` header centrally. The UI supports development workspace setup,
+basic member enrollment, tagged team-context sharing and personal tag preferences.

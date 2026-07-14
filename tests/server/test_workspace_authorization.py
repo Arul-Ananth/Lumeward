@@ -6,6 +6,7 @@ from backend.common.database import get_engine
 from backend.common.models.sql import Organization, OrganizationMembership, User, Workspace, WorkspaceMembership
 from backend.common.services.auth.types import AuthPrincipal
 from backend.common.services.authorization import (
+    add_organization_member,
     build_request_context,
     create_organization_for_user,
     create_workspace,
@@ -121,6 +122,58 @@ def test_workspace_role_does_not_leak_from_another_workspace(isolated_data_dir) 
         with pytest.raises(HTTPException) as error:
             require_workspace_role(member_context, "workspace_admin")
         assert error.value.status_code == 403
+
+
+def test_request_context_exposes_only_selected_workspace(isolated_data_dir) -> None:
+    with Session(get_engine()) as session:
+        user = User(email="scope@example.com", full_name="Scope", hashed_password="disabled")
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        first_org = create_organization_for_user(session, user_id=user.id, name="First", slug="first")
+        first = create_workspace(
+            session, organization_id=first_org.id, actor_user_id=user.id, name="First", slug="first"
+        )
+        second_org = Organization(name="Second", slug="second")
+        session.add(second_org)
+        session.commit()
+        session.refresh(second_org)
+        second = Workspace(organization_id=second_org.id, name="Second", slug="second")
+        session.add(second)
+        session.commit()
+        session.refresh(second)
+        session.add_all([
+            OrganizationMembership(organization_id=second_org.id, user_id=user.id, role="member"),
+            WorkspaceMembership(workspace_id=second.id, user_id=user.id, role="member"),
+        ])
+        session.commit()
+        principal = AuthPrincipal(
+            user_id=user.id, identity_id=1, provider="test", subject=user.email,
+            auth_mode="interactive", transport="test", user=user,
+        )
+
+        selected = build_request_context(session, principal, first.id)
+        assert selected.workspace_ids == (first.id,)
+        assert selected.organization_ids == (first_org.id,)
+        assert build_request_context(session, principal).workspace_ids == ()
+        assert build_request_context(session, principal).organization_ids == ()
+
+
+def test_organization_admin_enrolls_existing_user(isolated_data_dir) -> None:
+    with Session(get_engine()) as session:
+        owner = User(email="org-owner@example.com", full_name="Owner", hashed_password="disabled")
+        member = User(email="org-member@example.com", full_name="Member", hashed_password="disabled")
+        session.add_all([owner, member])
+        session.commit()
+        session.refresh(owner)
+        organization = create_organization_for_user(session, user_id=owner.id, name="Org", slug="org")
+
+        membership = add_organization_member(
+            session, organization_id=organization.id, actor_user_id=owner.id,
+            email=member.email, role="member",
+        )
+        assert membership.user_id == member.id
+        assert membership.role == "member"
 
 
 def test_user_can_bootstrap_one_organization_and_workspace_admin_can_create_workspace(isolated_data_dir) -> None:

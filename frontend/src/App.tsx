@@ -34,7 +34,7 @@ function BackendUnavailableScreen({ message }: { message: string }) {
           The frontend is configured to call {getApiBaseUrl()}. Start the Lumeward server there or update `VITE_API_BASE_URL`.
         </Typography>
         <Box component="pre" sx={{ m: 0, p: 2, borderRadius: 1, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', overflowX: 'auto' }}>
-{`.\\venv_win\\Scripts\\python.exe backend\\main.py --mode server`}
+{`.\\venv_win\\Scripts\\uv.exe run lumeward --mode server`}
         </Box>
       </Stack>
     </Container>

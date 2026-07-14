@@ -91,9 +91,9 @@ logging and normal enterprise deployment controls when exposed beyond localhost.
 - Tags have personal preference weights and workspace policies.
 - Plugin manifests and grants are stored independently, but plugins do not execute yet.
 
-Organization member administration is not yet exposed as a complete end-user
-workflow, so multi-user onboarding still needs an administration route or an
-external identity provisioning integration.
+The interactive web UI supports development workspace setup, least-privilege
+member enrollment, workspace selection, tagged context sharing and personal
+tag preferences. Production identity provisioning remains future work.
 
 ## Model connectivity
 

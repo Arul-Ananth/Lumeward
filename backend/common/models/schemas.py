@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -42,6 +42,7 @@ class WorkspaceResponse(StrictBaseModel):
     name: str
     slug: str
     role: str
+    organization_role: str
 
 
 class OrganizationCreate(StrictBaseModel):
@@ -61,9 +62,14 @@ class WorkspaceCreate(StrictBaseModel):
     slug: str = Field(min_length=1, max_length=120, pattern=r"^[a-z0-9][a-z0-9-]*$")
 
 
+class OrganizationMemberCreate(StrictBaseModel):
+    email: EmailStr
+    role: Literal["member", "organization_admin"] = "member"
+
+
 class WorkspaceMemberCreate(StrictBaseModel):
     email: EmailStr
-    role: str = Field(default="member", min_length=1, max_length=64)
+    role: Literal["member", "workspace_admin"] = "member"
 
 
 class TagResponse(StrictBaseModel):
@@ -126,6 +132,7 @@ class ContextIngestRequest(StrictBaseModel):
     text: str = Field(min_length=1, max_length=100000)
     source: str = Field(min_length=1, max_length=80, pattern=r"^[a-z0-9._-]+$")
     title: str = Field(default="", max_length=255)
+    tag_ids: list[int] = Field(default_factory=list, max_length=20)
 
 
 class ContextIngestResponse(StrictBaseModel):

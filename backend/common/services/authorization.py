@@ -52,17 +52,19 @@ def build_request_context(
         for membership, workspace in workspace_rows
         if workspace.id is not None and workspace.organization_id in organization_ids
     ]
-    workspace_ids = tuple(int(workspace.id) for _membership, workspace in eligible_workspaces)
-    if requested_workspace_id is not None and requested_workspace_id not in workspace_ids:
+    eligible_workspace_ids = tuple(int(workspace.id) for _membership, workspace in eligible_workspaces)
+    if requested_workspace_id is not None and requested_workspace_id not in eligible_workspace_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Workspace access denied")
 
     # Roles must be evaluated for the selected workspace, not accumulated from
     # every workspace the user can access. Organization-level roles apply only
     # within the active workspace's organization.
     roles: set[str] = set()
+    active_organization_id: int | None = None
     if requested_workspace_id is not None:
         for membership, workspace in eligible_workspaces:
             if workspace.id == requested_workspace_id:
+                active_organization_id = int(workspace.organization_id)
                 roles.add(membership.role)
                 organization_role = organization_roles.get(int(workspace.organization_id))
                 if organization_role:
@@ -70,21 +72,27 @@ def build_request_context(
                 break
     return RequestContext(
         user_id=principal.user_id,
-        organization_ids=tuple(sorted(organization_ids)),
-        workspace_ids=workspace_ids,
+        organization_ids=(active_organization_id,) if active_organization_id is not None else (),
+        workspace_ids=(requested_workspace_id,) if requested_workspace_id is not None else (),
         active_workspace_id=requested_workspace_id,
         roles=frozenset(roles),
     )
 
 
-def get_workspace_memberships(session: Session, user_id: int) -> list[tuple[Workspace, str]]:
+def get_workspace_memberships(session: Session, user_id: int) -> list[tuple[Workspace, str, str]]:
     rows = session.exec(
-        select(Workspace, WorkspaceMembership.role)
+        select(Workspace, WorkspaceMembership.role, OrganizationMembership.role)
         .join(WorkspaceMembership, WorkspaceMembership.workspace_id == Workspace.id)
-        .where(WorkspaceMembership.user_id == user_id, WorkspaceMembership.is_active)
+        .join(OrganizationMembership, OrganizationMembership.organization_id == Workspace.organization_id)
+        .where(
+            WorkspaceMembership.user_id == user_id,
+            WorkspaceMembership.is_active,
+            OrganizationMembership.user_id == user_id,
+            OrganizationMembership.is_active,
+        )
         .order_by(Workspace.name)
     ).all()
-    return [(workspace, role) for workspace, role in rows]
+    return [(workspace, workspace_role, organization_role) for workspace, workspace_role, organization_role in rows]
 
 
 def require_workspace_role(context: RequestContext, *allowed_roles: str) -> None:
@@ -132,7 +140,7 @@ def create_workspace(
             OrganizationMembership.is_active,
         )
     ).first()
-    if membership is None or membership.role not in {"organization_admin", "workspace_admin"}:
+    if membership is None or membership.role != "organization_admin":
         raise PermissionError("Organization administration permission required")
     workspace = Workspace(organization_id=organization_id, name=name, slug=slug)
     session.add(workspace)
@@ -149,6 +157,43 @@ def create_workspace(
         session.rollback()
         raise ValueError("Workspace slug already exists")
     return workspace
+
+
+def add_organization_member(
+    session: Session,
+    *,
+    organization_id: int,
+    actor_user_id: int,
+    email: str,
+    role: str,
+) -> OrganizationMembership:
+    actor = session.exec(
+        select(OrganizationMembership).where(
+            OrganizationMembership.organization_id == organization_id,
+            OrganizationMembership.user_id == actor_user_id,
+            OrganizationMembership.role == "organization_admin",
+            OrganizationMembership.is_active,
+        )
+    ).first()
+    if actor is None:
+        raise PermissionError("Organization administration permission required")
+    user = session.exec(select(User).where(User.email == email.strip().lower())).first()
+    if user is None:
+        raise ValueError("User not found")
+    membership = session.exec(
+        select(OrganizationMembership).where(
+            OrganizationMembership.organization_id == organization_id,
+            OrganizationMembership.user_id == user.id,
+        )
+    ).first()
+    if membership is None:
+        membership = OrganizationMembership(organization_id=organization_id, user_id=user.id)
+    membership.role = role
+    membership.is_active = True
+    session.add(membership)
+    session.commit()
+    session.refresh(membership)
+    return membership
 
 
 def add_workspace_member(

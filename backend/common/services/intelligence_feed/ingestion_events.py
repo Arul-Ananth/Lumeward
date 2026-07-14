@@ -11,7 +11,7 @@ from backend.common.security.policy import InputSanitizer
 from backend.common.services.intelligence_feed.schemas import NormalizedEvent
 
 _sanitizer = InputSanitizer()
-FEED_EVENT_TYPES = {"clipboard", "file_ingestion", "generate_newsletter"}
+FEED_EVENT_TYPES = {"clipboard", "file_ingestion", "generate_newsletter", "workspace_context"}
 
 
 def load_unprocessed_events(

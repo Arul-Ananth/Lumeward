@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 
 from sqlmodel import Session
 
@@ -11,6 +12,7 @@ from backend.common.services.intelligence_feed.feed_scorer import FeedScorer
 from backend.common.services.intelligence_feed.feed_triage import FeedTriage
 from backend.common.services.intelligence_feed.ingestion_events import load_unprocessed_events
 from backend.common.services.intelligence_feed.schemas import FeedCard
+from backend.common.services.tags import feed_tag_adjustment
 
 logger = logging.getLogger(__name__)
 _sanitizer = InputSanitizer()
@@ -41,6 +43,18 @@ class IntelligenceFeedRouter:
         ):
             try:
                 score = self.scorer.score(event)
+                muted, adjustment = feed_tag_adjustment(
+                    session,
+                    event_id=event.event_id,
+                    user_id=user_id,
+                    workspace_id=workspace_ids[0] if len(workspace_ids) == 1 else None,
+                )
+                score = replace(
+                    score,
+                    interest_score=max(0.0, min(1.0, score.interest_score + adjustment)),
+                    priority_score=max(0.0, min(1.0, score.priority_score + adjustment)),
+                    muted=score.muted or muted,
+                )
                 if score.muted or self.deduper.is_duplicate(session, event, score.topic_key):
                     continue
                 triage = self.triage.triage(event, score)

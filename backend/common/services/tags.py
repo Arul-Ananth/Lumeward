@@ -5,6 +5,7 @@ import re
 from sqlmodel import Session, select
 
 from backend.common.models.sql import (
+    ContextTag,
     OrganizationMembership,
     Tag,
     UserTagPreference,
@@ -36,7 +37,14 @@ def create_tag(session: Session, *, organization_id: int, display_name: str) -> 
 
 def list_workspace_tags(session: Session, *, workspace_id: int, user_id: int) -> list[Tag]:
     workspace = session.get(Workspace, workspace_id)
-    if workspace is None or not _is_org_member(session, workspace.organization_id, user_id):
+    membership = session.exec(
+        select(WorkspaceMembership).where(
+            WorkspaceMembership.workspace_id == workspace_id,
+            WorkspaceMembership.user_id == user_id,
+            WorkspaceMembership.is_active,
+        )
+    ).first()
+    if workspace is None or membership is None:
         raise PermissionError("Workspace access denied")
     return list(
         session.exec(
@@ -103,6 +111,34 @@ def set_workspace_tag_policy(
     session.commit()
     session.refresh(policy)
     return policy
+
+
+def feed_tag_adjustment(
+    session: Session,
+    *,
+    event_id: int,
+    user_id: int,
+    workspace_id: int | None,
+) -> tuple[bool, float]:
+    """Return whether tags hide a card and a bounded personal/team score adjustment."""
+    tag_ids = list(session.exec(select(ContextTag.tag_id).where(ContextTag.event_id == event_id)).all())
+    if not tag_ids:
+        return False, 0.0
+    preferences = session.exec(
+        select(UserTagPreference).where(
+            UserTagPreference.user_id == user_id,
+            UserTagPreference.tag_id.in_(tag_ids),
+        )
+    ).all()
+    policies = session.exec(
+        select(WorkspaceTagPolicy).where(
+            WorkspaceTagPolicy.workspace_id == workspace_id,
+            WorkspaceTagPolicy.tag_id.in_(tag_ids),
+        )
+    ).all() if workspace_id is not None else []
+    muted = any(item.muted for item in preferences) or any(item.blocked for item in policies)
+    adjustment = 0.15 * (sum(item.weight for item in preferences) + sum(item.priority for item in policies))
+    return muted, max(-0.5, min(0.5, adjustment))
 
 
 def _is_org_member(session: Session, organization_id: int, user_id: int) -> bool:

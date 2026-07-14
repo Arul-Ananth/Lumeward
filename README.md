@@ -112,6 +112,8 @@ files are cleaned up.
 - Interactive users have individual identities and opaque server sessions.
 - Organizations, workspaces, memberships, scoped context, tags, user tag preferences,
   workspace tag policies, plugin manifests, and independent plugin grants are implemented.
+- The web UI can set up and select workspaces, add existing users with basic
+  membership, share tagged context and verify personalized team feeds.
 - Plugin execution and plugin-driven ingestion remain future work.
 - Self-signup is intended for development; production enterprise deployments should provision identities centrally.
 
@@ -252,6 +254,7 @@ Interactive server:
 - [modes.md](./modes.md): runtime modes, trust profiles, connectivity profiles
 - [docs/architecture/overview.md](./docs/architecture/overview.md): current codebase structure and implementation shape
 - [docs/security.md](./docs/security.md): trust boundaries and safeguards
+- [docs/deployment/enterprise-testing.md](./docs/deployment/enterprise-testing.md): exact two-user end-to-end test
 - [docs/roadmap.md](./docs/roadmap.md): implemented work so far plus possible future items that may or may not happen
 
 ## Future Items

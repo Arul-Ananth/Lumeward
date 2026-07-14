@@ -1,14 +1,18 @@
-import { AppBar, Toolbar, Typography, Container, Tabs, Tab, Button, Box, Chip } from '@mui/material';
+import { AppBar, Toolbar, Typography, Container, Tabs, Tab, Button, Box, Chip, MenuItem, Select } from '@mui/material';
 import { SmartToy as BotIcon, Psychology as BrainIcon, Newspaper as NewsIcon } from '@mui/icons-material';
 
 import { useAuth } from '../hooks/useAuth';
+import type { Workspace } from '../services/api';
 
 interface CustomAppBarProps {
     tabIndex: number;
     setTabIndex: (index: number) => void;
+    workspaces: Workspace[];
+    workspaceId: number | null;
+    onWorkspaceChange: (id: number) => void;
 }
 
-export default function CustomAppBar({ tabIndex, setTabIndex }: CustomAppBarProps) {
+export default function CustomAppBar({ tabIndex, setTabIndex, workspaces, workspaceId, onWorkspaceChange }: CustomAppBarProps) {
     const { status, logout } = useAuth();
     const trustedLan = status?.trusted_lan_mode;
 
@@ -25,6 +29,21 @@ export default function CustomAppBar({ tabIndex, setTabIndex }: CustomAppBarProp
                         <Tab icon={<NewsIcon />} label="News" />
                         <Tab icon={<BrainIcon />} label="Memory" />
                     </Tabs>
+
+                    {workspaces.length > 0 && (
+                        <Select
+                            size="small"
+                            value={workspaceId ?? ''}
+                            onChange={(event) => onWorkspaceChange(Number(event.target.value))}
+                            displayEmpty
+                            sx={{ ml: 2, minWidth: 160 }}
+                        >
+                            <MenuItem value="" disabled>Select workspace</MenuItem>
+                            {workspaces.map((workspace) => (
+                                <MenuItem key={workspace.id} value={workspace.id}>{workspace.name}</MenuItem>
+                            ))}
+                        </Select>
+                    )}
 
                     <Box sx={{ ml: 2, display: 'flex', gap: 1 }}>
                         <Chip

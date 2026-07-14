@@ -7,6 +7,7 @@ from backend.common.models.schemas import (
     AuthStatus,
     MessageResponse,
     OrganizationCreate,
+    OrganizationMemberCreate,
     OrganizationResponse,
     SignupResponse,
     UserLogin,
@@ -30,6 +31,7 @@ from backend.common.services.auth.store import revoke_session_token
 from backend.common.services.auth.transports import extract_bearer_token
 from backend.common.services.auth.types import AuthContext, AuthPrincipal
 from backend.common.services.authorization import (
+    add_organization_member,
     add_workspace_member,
     create_organization_for_user,
     create_workspace,
@@ -92,8 +94,9 @@ def list_workspaces(
             name=workspace.name,
             slug=workspace.slug,
             role=role,
+            organization_role=organization_role,
         )
-        for workspace, role in get_workspace_memberships(session, principal.user_id)
+        for workspace, role, organization_role in get_workspace_memberships(session, principal.user_id)
     ]
 
 
@@ -141,7 +144,30 @@ def create_workspace_route(
         name=workspace.name,
         slug=workspace.slug,
         role="workspace_admin",
+        organization_role="organization_admin",
     )
+
+
+@router.post("/organizations/{organization_id}/members", status_code=201, response_model=MessageResponse)
+def add_organization_member_route(
+    organization_id: int,
+    request: OrganizationMemberCreate,
+    principal: AuthPrincipal = Depends(get_current_principal),
+    session: Session = Depends(get_session),
+):
+    try:
+        add_organization_member(
+            session,
+            organization_id=organization_id,
+            actor_user_id=principal.user_id,
+            email=request.email,
+            role=request.role,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return MessageResponse(message="Organization member added")
 
 
 @router.post("/workspaces/{workspace_id}/members", status_code=201, response_model=MessageResponse)

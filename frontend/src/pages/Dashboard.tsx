@@ -14,10 +14,14 @@ import {
 } from '@mui/icons-material';
 
 import { api } from '../services/api';
-import type { MemoryRecord, NewsletterResponse } from '../services/api';
+import type { FeedCard, MemoryRecord, NewsletterResponse, Workspace } from '../services/api';
 import CustomAppBar from '../components/CustomAppBar';
+import WorkspacePanel from '../features/workspaces/WorkspacePanel';
+import { getWorkspaceId, setWorkspaceId } from '../features/auth/storage';
+import { useAuth } from '../hooks/useAuth';
 
 const Dashboard = () => {
+    const { status } = useAuth();
     const [topic, setTopic] = useState('');
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<NewsletterResponse | null>(null);
@@ -30,6 +34,35 @@ const Dashboard = () => {
     const [uploadStatus, setUploadStatus] = useState('');
     const [uploadError, setUploadError] = useState('');
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+    const [workspaceId, selectWorkspace] = useState<number | null>(null);
+    const [feed, setFeed] = useState<FeedCard[]>([]);
+    const [workspacesLoaded, setWorkspacesLoaded] = useState(false);
+    const interactive = status?.auth_mode === 'interactive';
+    const workspace = workspaces.find((item) => item.id === workspaceId) ?? null;
+
+    useEffect(() => {
+        if (!interactive) return;
+        void api.listWorkspaces().then((items) => {
+            setWorkspaces(items);
+            const stored = getWorkspaceId();
+            const selected = items.some((item) => item.id === stored) ? stored : items[0]?.id ?? null;
+            selectWorkspace(selected);
+            setWorkspaceId(selected);
+        }).finally(() => setWorkspacesLoaded(true));
+    }, [interactive]);
+
+    const changeWorkspace = (id: number) => {
+        selectWorkspace(id);
+        setWorkspaceId(id);
+        setResult(null);
+        setFeed([]);
+    };
+
+    const addWorkspace = (created: Workspace) => {
+        setWorkspaces((items) => [...items, created]);
+        changeWorkspace(created.id);
+    };
 
     const handleGenerate = async () => {
         if (!topic) return;
@@ -107,11 +140,19 @@ const Dashboard = () => {
     return (
         // FIX: MinHeight set to 100dvh to fill screen on mobile and desktop
         <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100dvh' }}>
-            <CustomAppBar tabIndex={tabIndex} setTabIndex={setTabIndex} />
+            <CustomAppBar
+                tabIndex={tabIndex}
+                setTabIndex={setTabIndex}
+                workspaces={workspaces}
+                workspaceId={workspaceId}
+                onWorkspaceChange={changeWorkspace}
+            />
 
             {/* FIX: flexGrow: 1 pushes the bottom of the container to the bottom of the viewport */}
             <Container maxWidth={false} component="main" sx={{ mt: 4, mb: 4, flexGrow: 1 }}>
-                {tabIndex === 0 ? (
+                {interactive && workspacesLoaded && !workspace ? (
+                    <WorkspacePanel workspace={null} onWorkspaceCreated={addWorkspace} />
+                ) : tabIndex === 0 ? (
                     <Grid container spacing={3}>
                         <Grid size={{ xs: 12, md: 4 }}>
                             <Paper sx={{ p: 3, borderRadius: 2 }}>
@@ -129,7 +170,7 @@ const Dashboard = () => {
                                     variant="contained"
                                     size="large"
                                     onClick={handleGenerate}
-                                    disabled={loading || !topic}
+                                    disabled={loading || !topic || (interactive && !workspace)}
                                     startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <SendIcon />}
                                     sx={{ mt: 2 }}
                                 >
@@ -143,10 +184,14 @@ const Dashboard = () => {
                                 )}
                             </Paper>
 
+                            {interactive && workspace && (
+                                <WorkspacePanel workspace={workspace} onWorkspaceCreated={addWorkspace} />
+                            )}
+
                             <Paper sx={{ p: 3, borderRadius: 2, mt: 3 }}>
                                 <Typography variant="h6" gutterBottom>Upload Folder</Typography>
                                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                    Upload a zipped folder to index supported documents for server memory.
+                                    Upload a zipped folder to your private server memory.
                                 </Typography>
                                 <input
                                     ref={fileInputRef}
@@ -178,6 +223,13 @@ const Dashboard = () => {
                         </Grid>
 
                         <Grid size={{ xs: 12, md: 8 }}>
+                            {interactive && workspace && (
+                                <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                                    <Button startIcon={<RefreshIcon />} onClick={() => void api.getFeed().then(setFeed).catch((error) => {
+                                        setErrorMsg(error instanceof Error ? error.message : 'Unable to load feed.');
+                                    })}>Refresh team feed</Button>
+                                </Box>
+                            )}
                             {result ? (
                                 <Paper sx={{ p: 4, borderRadius: 2 }}>
                                     <Typography variant="h5" gutterBottom>{result.topic}</Typography>
@@ -194,9 +246,25 @@ const Dashboard = () => {
                                         </IconButton>
                                     </Box>
                                 </Paper>
+                            ) : feed.length > 0 ? (
+                                <Grid container spacing={2}>
+                                    {feed.map((item) => (
+                                        <Grid size={{ xs: 12, md: 6 }} key={item.id}>
+                                            <Card variant="outlined">
+                                                <CardContent>
+                                                    <Typography variant="h6">{item.title}</Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        {item.bullets.join(' ')}
+                                                    </Typography>
+                                                    <Box sx={{ mt: 1 }}>{item.topics.map((tag) => <Chip key={tag} label={tag} size="small" sx={{ mr: 0.5 }} />)}</Box>
+                                                </CardContent>
+                                            </Card>
+                                        </Grid>
+                                    ))}
+                                </Grid>
                             ) : (
                                 <Box sx={{ height: 400, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed grey', borderRadius: 2 }}>
-                                    <Typography color="text.secondary">Enter a topic to start.</Typography>
+                                    <Typography color="text.secondary">Request a briefing or refresh the selected workspace feed.</Typography>
                                 </Box>
                             )}
                         </Grid>

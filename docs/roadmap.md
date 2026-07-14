@@ -9,6 +9,7 @@
 - User, workspace and organization ownership on events and vector payloads.
 - Workspace-scoped text/file/bridge ingestion from enterprise desktop clients.
 - Personal tag preferences and workspace tag policies.
+- Web workspace setup, selection, member enrollment and tagged context sharing.
 - Plugin installation metadata and independently scoped capability grants.
 - Typed generation entry point, consolidated document ingestion and scoped retrieval.
 - Newsletter templates, history, schedules, feed cards and deep dives.
@@ -17,9 +18,8 @@
 
 ## Next important work
 
-- Complete organization-member administration and end-user team onboarding.
 - Replace development self-signup with OIDC/enterprise provisioning.
-- Add an administration surface for memberships, tags and plugin grants.
+- Add production invitations, deprovisioning and plugin-grant administration.
 - Add compliant deletion, retention enforcement, audit records and export workflows.
 - Add signed server/desktop installers, SBOMs and release CI for target platforms.
 - Add live PostgreSQL/Qdrant isolation and upgrade tests.

@@ -1,4 +1,4 @@
-import { getSessionToken } from '../features/auth/storage';
+import { getSessionToken, getWorkspaceId } from '../features/auth/storage';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 
@@ -36,6 +36,10 @@ export async function apiRequest<T>(
     }
     if (token && !requestHeaders.has('Authorization')) {
         requestHeaders.set('Authorization', `Bearer ${token}`);
+    }
+    const workspaceId = getWorkspaceId();
+    if (workspaceId && !requestHeaders.has('X-Workspace-ID')) {
+        requestHeaders.set('X-Workspace-ID', String(workspaceId));
     }
 
     let response: Response;

@@ -52,7 +52,7 @@ hardening.
 ## Deferred security work
 
 - OIDC federation and group/role synchronization.
-- Complete organization-member administration.
+- Production invitations, centralized provisioning and deprovisioning.
 - Retention/deletion enforcement across SQL, Qdrant, backups and derived artifacts.
 - Isolated plugin workers, plugin secrets and enforced egress/filesystem grants.
 - A reviewed public-internet deployment profile.

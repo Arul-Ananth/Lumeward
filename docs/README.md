@@ -9,6 +9,7 @@
 - `security.md`: current trust boundaries, safeguards and deferred hardening.
 - `roadmap.md`: implemented, next and explicitly deferred work.
 - `deployment/enterprise-packaging.md`: native Qdrant and server/desktop distribution model.
+- `deployment/enterprise-testing.md`: two-user web and desktop verification flow.
 
 ## Component documentation
 

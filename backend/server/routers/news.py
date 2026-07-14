@@ -132,6 +132,7 @@ def ingest_context(
             user_id=principal.user_id,
             organization_id=workspace_row.organization_id,
             workspace_id=workspace_id,
+            tag_ids=request.tag_ids,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

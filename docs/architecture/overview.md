@@ -60,7 +60,8 @@ connected to an enterprise server.
 ## Current limitations
 
 - Production identity federation and centralized provisioning are not implemented.
-- Organization-member administration is not a complete user-facing workflow.
+- The web UI provides development organization/workspace setup, basic member
+  grants, tags and explicit context sharing.
 - Plugin execution, plugin secrets and plugin ingestion are deferred.
 - PostgreSQL reconciliation covers the ownership delta introduced in this release,
   not arbitrary future model changes.

@@ -6,10 +6,10 @@ import json
 from datetime import datetime
 
 from qdrant_client.http import models
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from backend.common.config import settings
-from backend.common.models.sql import EventRaw
+from backend.common.models.sql import ContextTag, EventRaw, Tag
 from backend.common.services.context_items import create_context_item
 from backend.common.services.memory.point_ids import stable_point_id
 from backend.common.services.memory.vector_db import client, ensure_collection, get_embedder
@@ -25,6 +25,7 @@ def ingest_workspace_text(
     organization_id: int,
     workspace_id: int,
     title: str = "",
+    tag_ids: list[int] | None = None,
 ) -> int:
     """Index user-approved text and record its team workspace ownership."""
     content = text.strip()
@@ -33,6 +34,10 @@ def ingest_workspace_text(
     chunks = chunk_text(content, settings.CHUNK_SIZE, settings.CHUNK_OVERLAP)
     if not chunks:
         raise ValueError("Context text cannot be indexed.")
+    selected_tag_ids = list(dict.fromkeys(tag_ids or []))
+    tags = session.exec(select(Tag).where(Tag.id.in_(selected_tag_ids))).all() if selected_tag_ids else []
+    if len(tags) != len(selected_tag_ids) or any(tag.organization_id != organization_id for tag in tags):
+        raise ValueError("Every tag must belong to the selected workspace organization.")
     content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
     ensure_collection(settings.QDRANT_COLLECTION_USER_DOCS)
     vectors = get_embedder().encode(chunks).tolist()
@@ -50,6 +55,7 @@ def ingest_workspace_text(
                     "visibility": "workspace",
                     "source": source,
                     "title": title,
+                    "tag_ids": selected_tag_ids,
                     "timestamp": datetime.utcnow().isoformat(),
                 },
             )
@@ -71,5 +77,6 @@ def ingest_workspace_text(
     session.add(event)
     session.flush()
     create_context_item(session, event)
+    session.add_all(ContextTag(event_id=event.id, tag_id=tag_id) for tag_id in selected_tag_ids)
     session.commit()
     return len(chunks)
