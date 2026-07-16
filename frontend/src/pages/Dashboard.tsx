@@ -16,7 +16,6 @@ import {
 import { api } from '../services/api';
 import type { FeedCard, MemoryRecord, NewsletterResponse, Workspace } from '../services/api';
 import CustomAppBar from '../components/CustomAppBar';
-import WorkspacePanel from '../features/workspaces/WorkspacePanel';
 import { getWorkspaceId, setWorkspaceId } from '../features/auth/storage';
 import { useAuth } from '../hooks/useAuth';
 
@@ -57,11 +56,6 @@ const Dashboard = () => {
         setWorkspaceId(id);
         setResult(null);
         setFeed([]);
-    };
-
-    const addWorkspace = (created: Workspace) => {
-        setWorkspaces((items) => [...items, created]);
-        changeWorkspace(created.id);
     };
 
     const handleGenerate = async () => {
@@ -151,7 +145,7 @@ const Dashboard = () => {
             {/* FIX: flexGrow: 1 pushes the bottom of the container to the bottom of the viewport */}
             <Container maxWidth={false} component="main" sx={{ mt: 4, mb: 4, flexGrow: 1 }}>
                 {interactive && workspacesLoaded && !workspace ? (
-                    <WorkspacePanel workspace={null} onWorkspaceCreated={addWorkspace} />
+                    <Alert severity="info">You are not assigned to a workspace yet. Ask an organization administrator for access.</Alert>
                 ) : tabIndex === 0 ? (
                     <Grid container spacing={3}>
                         <Grid size={{ xs: 12, md: 4 }}>
@@ -183,10 +177,6 @@ const Dashboard = () => {
                                     </Box>
                                 )}
                             </Paper>
-
-                            {interactive && workspace && (
-                                <WorkspacePanel workspace={workspace} onWorkspaceCreated={addWorkspace} />
-                            )}
 
                             <Paper sx={{ p: 3, borderRadius: 2, mt: 3 }}>
                                 <Typography variant="h6" gutterBottom>Upload Folder</Typography>
@@ -238,10 +228,10 @@ const Dashboard = () => {
                                         <ReactMarkdown>{result.content}</ReactMarkdown>
                                     </div>
                                     <Box sx={{ mt: 4, display: 'flex', gap: 1 }}>
-                                        <IconButton color="success" onClick={() => sendFeedback('positive', 'Great!')}>
+                                        <IconButton aria-label="Mark briefing helpful" color="success" onClick={() => sendFeedback('positive', 'Great!')}>
                                             <ThumbUpIcon />
                                         </IconButton>
-                                        <IconButton color="error" onClick={() => sendFeedback('negative', 'Bad.')}>
+                                        <IconButton aria-label="Mark briefing unhelpful" color="error" onClick={() => sendFeedback('negative', 'Bad.')}>
                                             <ThumbDownIcon />
                                         </IconButton>
                                     </Box>

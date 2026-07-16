@@ -15,12 +15,22 @@ export interface SignupResponse {
     auth_provider: string;
 }
 
+export interface OrganizationSignupResponse {
+    message: string;
+    user_id: number;
+    organization: { id: number; name: string; slug: string };
+    organization_role: 'organization_admin';
+    session_token: string;
+    onboarding_required: boolean;
+}
+
 export interface AuthContextValue {
     loading: boolean;
     status: AuthStatusResponse | null;
     refreshStatus: () => Promise<void>;
     login: (email: string, password: string) => Promise<AuthStatusResponse>;
     signup: (fullName: string, email: string, password: string) => Promise<SignupResponse>;
+    signupOrganization: (fullName: string, email: string, password: string, organizationName: string) => Promise<OrganizationSignupResponse>;
     logout: () => Promise<void>;
 }
 

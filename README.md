@@ -112,10 +112,14 @@ files are cleaned up.
 - Interactive users have individual identities and opaque server sessions.
 - Organizations, workspaces, memberships, scoped context, tags, user tag preferences,
   workspace tag policies, plugin manifests, and independent plugin grants are implemented.
-- The web UI can set up and select workspaces, add existing users with basic
-  membership, share tagged context and verify personalized team feeds.
+- The web UI provides a dedicated organization-administration portal with
+  self-service organization signup, required first-workspace onboarding,
+  role-aware people and workspace management, email invitations with copy-link
+  fallback, shared-context and tag-policy controls, and organization audit
+  history. Briefings and personal memory remain in a separate workspace view.
 - Plugin execution and plugin-driven ingestion remain future work.
-- Self-signup is intended for development; production enterprise deployments should provision identities centrally.
+- The current web release uses individual email/password sessions. OIDC and
+  external enterprise provisioning remain future authentication options.
 
 ### Desktop bridge
 
@@ -224,7 +228,8 @@ cd C:\Dev\lumeward
 Server mode requires PostgreSQL. Qdrant may be administrator-managed
 (`QDRANT_MODE=external`) or a native executable owned by the Lumeward server
 (`QDRANT_MODE=bundled`). Server startup creates missing application tables and
-idempotently reconciles the event-ownership columns; it does not use schema versions.
+idempotently reconciles the event-ownership columns plus the
+one-active-organization-membership index; it does not use schema versions.
 
 The development database helper still supports explicitly confirmed destructive refreshes:
 
@@ -256,6 +261,7 @@ Interactive server:
 - [docs/security.md](./docs/security.md): trust boundaries and safeguards
 - [docs/deployment/enterprise-testing.md](./docs/deployment/enterprise-testing.md): exact two-user end-to-end test
 - [docs/roadmap.md](./docs/roadmap.md): implemented work so far plus possible future items that may or may not happen
+- [docs/context-restoration/README.md](./docs/context-restoration/README.md): temporary cross-computer handoff for the current portal work
 
 ## Future Items
 

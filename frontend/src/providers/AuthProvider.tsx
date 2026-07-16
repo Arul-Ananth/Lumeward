@@ -8,7 +8,7 @@ import {
 
 import { AuthContext } from '../context/AuthContext';
 import { ApiError } from '../services/http';
-import { getAuthStatus, login as loginRequest, logout as logoutRequest, signup as signupRequest } from '../features/auth/api';
+import { getAuthStatus, login as loginRequest, logout as logoutRequest, signup as signupRequest, signupOrganization as signupOrganizationRequest } from '../features/auth/api';
 import { clearSessionToken, getSessionToken, setSessionToken } from '../features/auth/storage';
 import { buildOfflineAuthStatus, type AuthContextValue, type AuthStatusResponse, type SignupResponse } from '../features/auth/types';
 
@@ -73,6 +73,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return signupRequest(fullName, email, password);
     }, []);
 
+    const signupOrganization = useCallback(async (fullName: string, email: string, password: string, organizationName: string) => {
+        const response = await signupOrganizationRequest(fullName, email, password, organizationName);
+        if (response.session_token) setSessionToken(response.session_token);
+        const refreshed = await loadStatus();
+        setStatus(refreshed);
+        return response;
+    }, [loadStatus]);
+
     const logout = useCallback(async () => {
         try {
             await logoutRequest();
@@ -89,9 +97,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             refreshStatus,
             login,
             signup,
+            signupOrganization,
             logout,
         }),
-        [loading, status, refreshStatus, login, signup, logout],
+        [loading, status, refreshStatus, login, signup, signupOrganization, logout],
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

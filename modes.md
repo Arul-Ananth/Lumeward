@@ -46,8 +46,9 @@ Required server configuration:
 - Appropriate bind host, CORS origins and deployment network controls.
 
 Server startup creates missing application tables and idempotently adds the
-event-ownership columns needed by older databases. It does not use a schema
-version table. The database itself and its role must already exist.
+event-ownership columns and active-organization-membership uniqueness index
+needed by older databases. It does not use a schema version table. The database
+itself and its role must already exist.
 
 `scripts/dev/database.py` provides status, initialize and explicitly confirmed
 destructive refresh commands for disposable development databases. These are
@@ -75,9 +76,15 @@ identity and shared history are acceptable.
 
 `AUTH_MODE=interactive` gives each user an individual email/password identity
 and opaque bearer session. It is required for enterprise workspace membership,
-personal feed behavior and revocation. Development self-signup is enabled;
-production deployments should replace it with administrator or identity-provider
-provisioning.
+personal feed behavior and revocation. Web self-signup atomically creates an
+immediately active organization and its first administrator; the administrator
+must then create the first workspace. The older user-only signup remains for
+desktop compatibility. OIDC and centralized provisioning are future options,
+not requirements for the current release.
+
+Invitation email is optional. Configure `FRONTEND_PUBLIC_URL`,
+`INVITATION_EXPIRE_DAYS` and `SMTP_*` for delivery. Create/resend operations
+always return a copyable single-use link even when SMTP is unavailable.
 
 Interactive mode still requires TLS, reverse-proxy policy, strong secrets,
 logging and normal enterprise deployment controls when exposed beyond localhost.
@@ -91,9 +98,12 @@ logging and normal enterprise deployment controls when exposed beyond localhost.
 - Tags have personal preference weights and workspace policies.
 - Plugin manifests and grants are stored independently, but plugins do not execute yet.
 
-The interactive web UI supports development workspace setup, least-privilege
-member enrollment, workspace selection, tagged context sharing and personal
-tag preferences. Production identity provisioning remains future work.
+The interactive web UI separates the organization administration portal from
+the user workspace. Organization administrators manage people, invitations,
+workspaces, shared context, organization settings and audit activity. Workspace
+administrators are limited to assigned-workspace people, shared context and tag
+policies. Ordinary members use the briefing and personal features under
+`/workspace`.
 
 ## Model connectivity
 

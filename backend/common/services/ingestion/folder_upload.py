@@ -60,6 +60,9 @@ def ingest_folder_zip(
     filename: str,
     user_id: int,
     session_id: str = "server-upload",
+    organization_id: str | None = None,
+    workspace_id: str | None = None,
+    visibility: str = "private",
 ) -> FolderIngestResult:
     if not settings.FOLDER_UPLOAD_ENABLED:
         raise ValueError("Folder upload ingestion is disabled.")
@@ -104,7 +107,16 @@ def ingest_folder_zip(
     skipped = 0
     failed = 0
     for path in extracted_paths:
-        outcome = _ingest_file(session, path=path, user_id=user_id, session_id=session_id, batch_id=batch_id)
+        outcome = _ingest_file(
+            session,
+            path=path,
+            user_id=user_id,
+            session_id=session_id,
+            batch_id=batch_id,
+            organization_id=organization_id,
+            workspace_id=workspace_id,
+            visibility=visibility,
+        )
         if outcome == "ingested":
             ingested += 1
         elif outcome == "failed":
@@ -157,7 +169,17 @@ def _is_zip_symlink(member: zipfile.ZipInfo) -> bool:
     return (mode & 0o170000) == 0o120000
 
 
-def _ingest_file(session: Session, *, path: Path, user_id: int, session_id: str, batch_id: str) -> str:
+def _ingest_file(
+    session: Session,
+    *,
+    path: Path,
+    user_id: int,
+    session_id: str,
+    batch_id: str,
+    organization_id: str | None,
+    workspace_id: str | None,
+    visibility: str,
+) -> str:
     return document_ingestion.ingest(
         session,
         path=path,
@@ -165,7 +187,9 @@ def _ingest_file(session: Session, *, path: Path, user_id: int, session_id: str,
         session_id=session_id,
         batch_id=batch_id,
         source="folder_upload",
-        visibility="private",
+        organization_id=organization_id,
+        workspace_id=workspace_id,
+        visibility=visibility,
         ensure_collection_fn=ensure_collection,
         embedder_fn=get_embedder,
         qdrant_client=client,

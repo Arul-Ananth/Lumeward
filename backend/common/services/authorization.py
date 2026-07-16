@@ -13,6 +13,7 @@ from backend.common.models.sql import (
     Organization,
 )
 from backend.common.services.auth.types import AuthPrincipal
+from backend.common.services.admin_common import add_audit_event
 
 
 @dataclass(frozen=True)
@@ -117,6 +118,15 @@ def create_organization_for_user(session: Session, *, user_id: int, name: str, s
             user_id=user_id,
             role="organization_admin",
         ))
+        add_audit_event(
+            session,
+            organization_id=int(organization.id),
+            actor_user_id=user_id,
+            action="organization.created",
+            target_type="organization",
+            target_id=organization.id,
+            summary={"name": organization.name, "source": "legacy_api"},
+        )
         session.commit()
         session.refresh(organization)
     except Exception:
@@ -151,6 +161,15 @@ def create_workspace(
             user_id=actor_user_id,
             role="workspace_admin",
         ))
+        add_audit_event(
+            session,
+            organization_id=organization_id,
+            actor_user_id=actor_user_id,
+            action="workspace.created",
+            target_type="workspace",
+            target_id=workspace.id,
+            summary={"name": workspace.name, "source": "legacy_api"},
+        )
         session.commit()
         session.refresh(workspace)
     except Exception:
@@ -180,6 +199,15 @@ def add_organization_member(
     user = session.exec(select(User).where(User.email == email.strip().lower())).first()
     if user is None:
         raise ValueError("User not found")
+    other_active_membership = session.exec(
+        select(OrganizationMembership).where(
+            OrganizationMembership.user_id == user.id,
+            OrganizationMembership.is_active,
+            OrganizationMembership.organization_id != organization_id,
+        )
+    ).first()
+    if other_active_membership is not None:
+        raise ValueError("User already belongs to another active organization")
     membership = session.exec(
         select(OrganizationMembership).where(
             OrganizationMembership.organization_id == organization_id,
@@ -191,6 +219,15 @@ def add_organization_member(
     membership.role = role
     membership.is_active = True
     session.add(membership)
+    add_audit_event(
+        session,
+        organization_id=organization_id,
+        actor_user_id=actor_user_id,
+        action="member.updated",
+        target_type="user",
+        target_id=user.id,
+        summary={"organization_role": role, "is_active": True, "source": "legacy_api"},
+    )
     session.commit()
     session.refresh(membership)
     return membership
@@ -247,6 +284,15 @@ def add_workspace_member(
         membership.role = role
         membership.is_active = True
     session.add(membership)
+    add_audit_event(
+        session,
+        organization_id=int(workspace.organization_id),
+        actor_user_id=actor_user_id,
+        action="workspace_member.updated",
+        target_type="user",
+        target_id=user.id,
+        summary={"workspace_id": workspace_id, "role": role, "source": "legacy_api"},
+    )
     session.commit()
     session.refresh(membership)
     return membership

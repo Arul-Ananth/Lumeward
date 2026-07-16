@@ -22,12 +22,12 @@ export default function CustomAppBar({ tabIndex, setTabIndex, workspaces, worksp
                 <Toolbar disableGutters>
                     <BotIcon sx={{ mr: 1, color: 'primary.main' }} />
                     <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-                        Newsroom Agent
+                        Lumeward Workspace
                     </Typography>
 
                     <Tabs value={tabIndex} onChange={(_e, val) => setTabIndex(val)} textColor="primary" indicatorColor="primary">
-                        <Tab icon={<NewsIcon />} label="News" />
-                        <Tab icon={<BrainIcon />} label="Memory" />
+                        <Tab icon={<NewsIcon />} iconPosition="start" label="Briefings" />
+                        <Tab icon={<BrainIcon />} iconPosition="start" label="Memory" />
                     </Tabs>
 
                     {workspaces.length > 0 && (
@@ -36,6 +36,7 @@ export default function CustomAppBar({ tabIndex, setTabIndex, workspaces, worksp
                             value={workspaceId ?? ''}
                             onChange={(event) => onWorkspaceChange(Number(event.target.value))}
                             displayEmpty
+                            inputProps={{ 'aria-label': 'Current workspace' }}
                             sx={{ ml: 2, minWidth: 160 }}
                         >
                             <MenuItem value="" disabled>Select workspace</MenuItem>

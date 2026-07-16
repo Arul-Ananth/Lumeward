@@ -2,7 +2,6 @@ import type { FormEvent, ReactNode } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Divider from '@mui/material/Divider';
 import FormControl from '@mui/material/FormControl';
 import FormLabel from '@mui/material/FormLabel';
 import Link from '@mui/material/Link';
@@ -12,7 +11,6 @@ import { Link as RouterLink } from 'react-router-dom';
 
 import AuthCard from './AuthCard';
 import { SitemarkIcon } from './AuthIcons';
-import SocialAuthButtons from './SocialAuthButtons';
 
 interface AuthFormScaffoldProps {
     alternateHref: string;
@@ -21,7 +19,7 @@ interface AuthFormScaffoldProps {
     children: ReactNode;
     formError?: string;
     onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-    socialAction: 'Sign in' | 'Sign up';
+    submitting?: boolean;
     submitText: string;
     title: string;
 }
@@ -33,7 +31,7 @@ export default function AuthFormScaffold({
     children,
     formError,
     onSubmit,
-    socialAction,
+    submitting = false,
     submitText,
     title,
 }: AuthFormScaffoldProps) {
@@ -42,7 +40,7 @@ export default function AuthFormScaffold({
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <SitemarkIcon />
                 <Typography variant="overline" sx={{ letterSpacing: '0.2em' }}>
-                    Newsroom Agent
+                    Lumeward
                 </Typography>
             </Box>
             <Typography component="h1" variant="h4" sx={{ width: '100%', fontSize: 'clamp(2rem, 10vw, 2.15rem)' }}>
@@ -51,13 +49,11 @@ export default function AuthFormScaffold({
             <Box component="form" onSubmit={onSubmit} noValidate sx={{ display: 'flex', flexDirection: 'column', width: '100%', gap: 2 }}>
                 {children}
                 {formError && <Alert severity="error">{formError}</Alert>}
-                <Button type="submit" fullWidth variant="contained">
-                    {submitText}
+                <Button type="submit" fullWidth variant="contained" disabled={submitting}>
+                    {submitting ? 'Please wait…' : submitText}
                 </Button>
             </Box>
-            <Divider>or</Divider>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <SocialAuthButtons action={socialAction} />
                 <Typography sx={{ textAlign: 'center' }}>
                     {alternatePrompt}{' '}
                     <Link component={RouterLink} to={alternateHref} variant="body2">

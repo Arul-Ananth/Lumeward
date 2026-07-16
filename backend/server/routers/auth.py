@@ -23,7 +23,16 @@ from backend.common.models.schemas import (
     PluginInstallRequest,
     PluginInstallationResponse,
 )
-from backend.common.models.sql import OrganizationMembership
+from backend.common.models.admin_schemas import (
+    InvitationAccept,
+    InvitationAcceptResponse,
+    InvitationInspectResponse,
+    OrganizationSignupRequest,
+    OrganizationSignupResponse,
+    OrganizationSummary,
+    WorkspaceAssignmentResponse,
+)
+from backend.common.models.sql import Organization, OrganizationMembership, User
 from backend.common.services.auth.providers.interactive import login as interactive_login
 from backend.common.services.auth.providers.interactive import signup as interactive_signup
 from backend.common.services.auth.resolver import get_auth_context, get_current_principal
@@ -44,6 +53,13 @@ from backend.common.services.tags import (
     set_workspace_tag_policy,
 )
 from backend.common.services.plugins import grant_plugin_capability, install_plugin
+from backend.common.services.organization_admin import (
+    _workspace_assignments_for_invitation,
+    accept_invitation,
+    effective_invitation_status,
+    invitation_by_token,
+    signup_organization,
+)
 
 router = APIRouter(tags=["Auth"])
 
@@ -324,6 +340,95 @@ def signup(user_data: UserSignup, session: Session = Depends(get_session)):
         message="User created",
         user_id=user.id,
         auth_provider=identity.provider,
+    )
+
+
+@router.post("/organization-signup", status_code=201, response_model=OrganizationSignupResponse)
+def organization_signup(
+    request: OrganizationSignupRequest,
+    session: Session = Depends(get_session),
+):
+    if settings.auth_mode() != AuthMode.INTERACTIVE:
+        raise HTTPException(status_code=403, detail="Organization signup requires interactive authentication")
+    try:
+        user, organization, raw_token = signup_organization(session, request)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return OrganizationSignupResponse(
+        message="Organization created",
+        user_id=user.id,
+        organization=OrganizationSummary(
+            id=organization.id,
+            name=organization.name,
+            slug=organization.slug,
+        ),
+        organization_role="organization_admin",
+        session_token=raw_token,
+        onboarding_required=True,
+    )
+
+
+@router.get("/invitations/{token}", response_model=InvitationInspectResponse)
+def inspect_invitation(token: str, session: Session = Depends(get_session)):
+    try:
+        invitation = invitation_by_token(session, token)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    organization = session.get(Organization, invitation.organization_id)
+    if organization is None:
+        raise HTTPException(status_code=404, detail="Organization not found")
+    assignments = _workspace_assignments_for_invitation(session, invitation.id)
+    existing_user = session.exec(select(User).where(User.email == invitation.email)).first() is not None
+    return InvitationInspectResponse(
+        email=invitation.email,
+        organization=OrganizationSummary(
+            id=organization.id,
+            name=organization.name,
+            slug=organization.slug,
+        ),
+        organization_role=invitation.organization_role,
+        workspace_assignments=[
+            WorkspaceAssignmentResponse(
+                workspace_id=workspace.id,
+                workspace_name=workspace.name,
+                role=assignment.role,
+            )
+            for assignment, workspace in assignments
+        ],
+        status=effective_invitation_status(invitation),
+        expires_at=invitation.expires_at,
+        existing_user=existing_user,
+    )
+
+
+@router.post("/invitations/{token}/accept", response_model=InvitationAcceptResponse)
+def accept_organization_invitation(
+    token: str,
+    request: InvitationAccept,
+    auth_context: AuthContext = Depends(get_auth_context),
+    session: Session = Depends(get_session),
+):
+    try:
+        invitation = invitation_by_token(session, token, for_update=True)
+        organization, raw_session_token = accept_invitation(
+            session,
+            invitation,
+            request,
+            auth_context.principal if auth_context.authenticated else None,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except ValueError as exc:
+        status_code = 404 if "not found" in str(exc).lower() else 409
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    return InvitationAcceptResponse(
+        message="Invitation accepted",
+        organization=OrganizationSummary(
+            id=organization.id,
+            name=organization.name,
+            slug=organization.slug,
+        ),
+        session_token=raw_session_token,
     )
 
 

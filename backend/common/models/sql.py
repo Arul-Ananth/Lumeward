@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Index, Text, UniqueConstraint
+from sqlalchemy import Index, Text, UniqueConstraint, text
 from sqlmodel import Field, SQLModel
 
 
@@ -32,7 +32,15 @@ class Workspace(SQLModel, table=True):
 
 
 class OrganizationMembership(SQLModel, table=True):
-    __table_args__ = (UniqueConstraint("organization_id", "user_id", name="uq_org_membership"),)
+    __table_args__ = (
+        UniqueConstraint("organization_id", "user_id", name="uq_org_membership"),
+        Index(
+            "uq_org_membership_one_active_per_user",
+            "user_id",
+            unique=True,
+            postgresql_where=text("is_active"),
+        ).ddl_if(dialect="postgresql"),
+    )
 
     id: Optional[int] = Field(default=None, primary_key=True)
     organization_id: int = Field(foreign_key="organization.id", index=True)
@@ -123,6 +131,60 @@ class AuthSession(SQLModel, table=True):
     expires_at: datetime = Field(index=True)
     last_used_at: datetime = Field(default_factory=datetime.utcnow)
     revoked_at: datetime | None = None
+
+
+class OrganizationInvitation(SQLModel, table=True):
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_organization_invitation_token_hash"),
+        Index(
+            "ix_organizationinvitation_org_email_status",
+            "organization_id",
+            "email",
+            "status",
+        ),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
+    email: str = Field(index=True, max_length=255)
+    organization_role: str = Field(default="member", max_length=64)
+    token_hash: str = Field(max_length=64, index=True)
+    status: str = Field(default="pending", max_length=32, index=True)
+    expires_at: datetime = Field(index=True)
+    invited_by_user_id: int = Field(foreign_key="user.id", index=True)
+    accepted_by_user_id: int | None = Field(default=None, foreign_key="user.id", index=True)
+    email_delivery_status: str = Field(default="not_configured", max_length=32)
+    email_delivery_error: str | None = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    accepted_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+
+class InvitationWorkspaceAssignment(SQLModel, table=True):
+    __table_args__ = (
+        UniqueConstraint("invitation_id", "workspace_id", name="uq_invitation_workspace_assignment"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    invitation_id: int = Field(foreign_key="organizationinvitation.id", index=True)
+    workspace_id: int = Field(foreign_key="workspace.id", index=True)
+    role: str = Field(default="member", max_length=64)
+
+
+class OrganizationAuditEvent(SQLModel, table=True):
+    __table_args__ = (
+        Index("ix_organizationauditevent_org_created", "organization_id", "created_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organization_id: int = Field(foreign_key="organization.id", index=True)
+    actor_user_id: int | None = Field(default=None, foreign_key="user.id", index=True)
+    action: str = Field(max_length=120, index=True)
+    target_type: str = Field(max_length=80)
+    target_id: str | None = Field(default=None, max_length=128)
+    summary_json: str = Field(default="{}", sa_type=Text)
+    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
 class NewsletterTemplate(SQLModel, table=True):

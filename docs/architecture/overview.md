@@ -17,8 +17,8 @@ environment configuration and defaults.
 
 The relational model includes users, organizations, workspaces, organization
 and workspace memberships, tags, personal tag preferences, workspace tag
-policies, context items, retention-policy metadata, plugin installations and
-plugin grants.
+policies, context items, organization invitations, organization audit events,
+retention-policy metadata, plugin installations and plugin grants.
 
 Authenticated requests resolve a principal and an allowed request scope.
 `X-Workspace-ID` selects an active workspace. SQL event reads and Qdrant vector
@@ -33,7 +33,8 @@ foundation only. There is no plugin execution runtime or plugin context ingestio
 - Desktop uses local SQLite and embedded Qdrant.
 - Server requires an existing PostgreSQL database and role.
 - Server startup creates missing tables and idempotently reconciles the four
-  event-ownership columns and their indexes, without schema versioning.
+  event-ownership columns, their indexes and the one-active-organization-
+  membership partial index, without schema versioning.
 - Server Qdrant can be external or a configured bundled native executable.
 - Staged ZIP uploads are temporary; indexed SQL and Qdrant state persists.
 
@@ -41,6 +42,9 @@ foundation only. There is no plugin execution runtime or plugin context ingestio
 
 - `auth/`: identities, sessions and request principals.
 - `authorization.py`: organization/workspace membership and request scopes.
+- `organization_setup.py`: atomic organization signup and first-session creation.
+- `admin_common.py`, `admin_queries.py`, `membership_admin.py`, `invitations.py`
+  and `tag_admin.py`: organization-administration queries and mutations.
 - `newsletter/`: typed generation request, templates, persistence and schedules.
 - `memory/`: scoped Qdrant retrieval and feedback/profile memory.
 - `ingestion/`: files, ZIP uploads and workspace text ingestion.
@@ -48,6 +52,25 @@ foundation only. There is no plugin execution runtime or plugin context ingestio
 - `tags.py`: tag creation and personal/workspace policy.
 - `plugins.py`: metadata installations and grants only.
 - `telemetry/`: consented desktop collection and event processing.
+
+## Web administration flow
+
+In interactive mode, web signup creates the user, password identity,
+organization, active organization-administrator membership, audit record and
+session in one transaction. The organization is active immediately and its slug
+is generated server-side. The administrator must then create the first
+workspace before entering `/admin/overview`.
+
+The React client separates organization administration under `/admin/*` from
+briefings and personal features under `/workspace`. Organization administrators
+can manage the whole organization. Workspace administrators can see only their
+assigned workspace members, shared context and tag policies. Ordinary members
+do not receive administration navigation.
+
+Invitations use random, single-use tokens stored only as hashes. New users set a
+name and password during acceptance; existing users must sign in with the
+invited email. SMTP delivery is optional because every create/resend response
+also supplies a copyable invitation link.
 
 ## Desktop enterprise flow
 
@@ -60,9 +83,11 @@ connected to an enterprise server.
 ## Current limitations
 
 - Production identity federation and centralized provisioning are not implemented.
-- The web UI provides development organization/workspace setup, basic member
-  grants, tags and explicit context sharing.
+- Authentication is limited to email/password sessions. OIDC, email
+  verification, password reset, social login and MFA are not implemented.
+- The administration portal does not manage billing, infrastructure, secrets,
+  plugins, retention, custom roles or organization deletion.
 - Plugin execution, plugin secrets and plugin ingestion are deferred.
-- PostgreSQL reconciliation covers the ownership delta introduced in this release,
-  not arbitrary future model changes.
+- PostgreSQL reconciliation covers the ownership and active-membership deltas
+  introduced in this release, not arbitrary future model changes.
 - Public exposure still requires TLS, a reverse proxy and operational hardening.

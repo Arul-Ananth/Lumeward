@@ -37,6 +37,16 @@ class Settings(BaseSettings):
     TRUSTED_LAN_USER_EMAIL: str = "local@lan"
     TRUSTED_LAN_USER_NAME: str = "Trusted LAN User"
     AUTH_SESSION_EXPIRE_MINUTES: int = 720
+    FRONTEND_PUBLIC_URL: str = "http://localhost:5173"
+    INVITATION_EXPIRE_DAYS: int = 7
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_EMAIL: str = ""
+    SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
+    SMTP_TIMEOUT_SECONDS: int = 10
     ENTERPRISE_SERVER_URL: str = ""
     APP_VERSION: str = APP_VERSION
 
@@ -146,6 +156,10 @@ class Settings(BaseSettings):
             raise RuntimeError("BUNDLED_QDRANT_STARTUP_TIMEOUT_SECONDS must be positive.")
         if self.INGESTION_CONCURRENCY < 1:
             raise RuntimeError("INGESTION_CONCURRENCY must be at least 1.")
+        if self.INVITATION_EXPIRE_DAYS < 1:
+            raise RuntimeError("INVITATION_EXPIRE_DAYS must be at least 1.")
+        if self.SMTP_PORT < 1 or self.SMTP_TIMEOUT_SECONDS < 1:
+            raise RuntimeError("SMTP port and timeout must be positive.")
         qdrant_url = urlparse(self.QDRANT_URL.strip())
         if qdrant_url.scheme not in {"http", "https"} or not qdrant_url.netloc:
             raise RuntimeError("QDRANT_URL must be an absolute http:// or https:// URL.")

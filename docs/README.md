@@ -11,6 +11,18 @@
 - `deployment/enterprise-packaging.md`: native Qdrant and server/desktop distribution model.
 - `deployment/enterprise-testing.md`: two-user web and desktop verification flow.
 
+## Temporary context restoration
+
+- `context-restoration/README.md`: start here when moving this work to another
+  computer.
+- `context-restoration/implementation-handoff.md`: implemented scope, important
+  files, decisions and known limitations.
+- `context-restoration/verification.md`: reproducible checks and last known
+  results.
+
+This folder is intentionally temporary. Remove it after the work has been
+restored and the durable documentation has been confirmed on the new computer.
+
 ## Component documentation
 
 - `../backend/desktop/README.md`
@@ -29,6 +41,8 @@ current implementation:
 - `frontend_desktop_feature_parity_plan.md`
 - `audits/issues.md`
 - `audits/clipboard_history_diagnosis.md`
+- `audits/web_admin_ui_review_2026-07-15.md` (point-in-time review completed
+  before the organization administration portal implementation)
 
 ## Agent prompts
 

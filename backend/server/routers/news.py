@@ -37,7 +37,7 @@ from backend.common.services.ingestion.text_context import ingest_workspace_text
 from backend.common.services.auth.resolver import get_current_principal
 from backend.common.services.auth.resolver import get_request_context
 from backend.common.services.auth.types import AuthPrincipal
-from backend.common.services.authorization import RequestContext
+from backend.common.services.authorization import RequestContext, require_workspace_role
 from backend.common.services.memory import vector_db
 from backend.common.services.memory.vector_db import QdrantUnavailableError
 from backend.common.services.newsletter.pipeline import (
@@ -112,6 +112,7 @@ def ingest_context(
     request_context: CurrentRequestContext,
     session: DbSession,
 ):
+    require_workspace_role(request_context, "workspace_admin", "organization_admin")
     workspace_id = request_context.active_workspace_id
     if workspace_id is None:
         raise HTTPException(status_code=400, detail="Select a workspace before sharing context")
@@ -248,7 +249,14 @@ def _stream_upload_to_temp(file: UploadFile) -> Path:
         raise
 
 
-def _ingest_folder_in_worker(archive_path: Path, filename: str, user_id: int):
+def _ingest_folder_in_worker(
+    archive_path: Path,
+    filename: str,
+    user_id: int,
+    organization_id: str | None = None,
+    workspace_id: str | None = None,
+    visibility: str = "private",
+):
     with session_scope() as session:
         return ingest_folder_zip(
             session,
@@ -256,6 +264,9 @@ def _ingest_folder_in_worker(archive_path: Path, filename: str, user_id: int):
             filename=filename,
             user_id=user_id,
             session_id="server-upload",
+            organization_id=organization_id,
+            workspace_id=workspace_id,
+            visibility=visibility,
         )
 
 
@@ -264,6 +275,9 @@ async def _run_bounded_ingestion(
     filename: str,
     user_id: int,
     content_length: str | None = None,
+    organization_id: str | None = None,
+    workspace_id: str | None = None,
+    visibility: str = "private",
 ):
     max_bytes = settings.FOLDER_UPLOAD_MAX_ARCHIVE_MB * 1024 * 1024
     if file.size is not None and file.size > max_bytes:
@@ -279,7 +293,15 @@ async def _run_bounded_ingestion(
     async with ingestion_semaphore:
         archive_path = await asyncio.to_thread(_stream_upload_to_temp, file)
         try:
-            return await asyncio.to_thread(_ingest_folder_in_worker, archive_path, filename, user_id)
+            return await asyncio.to_thread(
+                _ingest_folder_in_worker,
+                archive_path,
+                filename,
+                user_id,
+                organization_id,
+                workspace_id,
+                visibility,
+            )
         finally:
             archive_path.unlink(missing_ok=True)
 

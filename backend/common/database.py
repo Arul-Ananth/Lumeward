@@ -101,6 +101,8 @@ def _reconcile_server_schema(engine: Engine) -> None:
         "CREATE INDEX IF NOT EXISTS ix_eventraw_owner_user_id ON eventraw (owner_user_id)",
         "CREATE INDEX IF NOT EXISTS ix_eventraw_visibility ON eventraw (visibility)",
         "CREATE INDEX IF NOT EXISTS ix_eventraw_owner_visibility ON eventraw (owner_user_id, visibility, ts)",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_org_membership_one_active_per_user "
+        "ON organizationmembership (user_id) WHERE is_active",
     )
     with engine.begin() as connection:
         for statement in statements:

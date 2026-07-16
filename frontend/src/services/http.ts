@@ -20,11 +20,13 @@ interface ApiRequestOptions {
     body?: unknown;
     headers?: HeadersInit;
     includeAuth?: boolean;
+    signal?: AbortSignal;
+    includeWorkspace?: boolean;
 }
 
 export async function apiRequest<T>(
     path: string,
-    { method = 'GET', body, headers, includeAuth = true }: ApiRequestOptions = {},
+    { method = 'GET', body, headers, includeAuth = true, signal, includeWorkspace = true }: ApiRequestOptions = {},
 ): Promise<T> {
     const requestHeaders = new Headers(headers || {});
     const token = includeAuth ? getSessionToken() : null;
@@ -37,7 +39,7 @@ export async function apiRequest<T>(
     if (token && !requestHeaders.has('Authorization')) {
         requestHeaders.set('Authorization', `Bearer ${token}`);
     }
-    const workspaceId = getWorkspaceId();
+    const workspaceId = includeWorkspace ? getWorkspaceId() : null;
     if (workspaceId && !requestHeaders.has('X-Workspace-ID')) {
         requestHeaders.set('X-Workspace-ID', String(workspaceId));
     }
@@ -48,8 +50,12 @@ export async function apiRequest<T>(
             method,
             headers: requestHeaders,
             body: isFormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
+            signal,
         });
     } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') {
+            throw error;
+        }
         const message = error instanceof Error ? error.message : 'Unknown network error';
         throw new ApiError(0, `Unable to reach backend at ${API_BASE_URL}. ${message}`);
     }

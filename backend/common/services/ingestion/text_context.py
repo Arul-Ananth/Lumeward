@@ -26,6 +26,7 @@ def ingest_workspace_text(
     workspace_id: int,
     title: str = "",
     tag_ids: list[int] | None = None,
+    commit: bool = True,
 ) -> int:
     """Index user-approved text and record its team workspace ownership."""
     content = text.strip()
@@ -78,5 +79,6 @@ def ingest_workspace_text(
     session.flush()
     create_context_item(session, event)
     session.add_all(ContextTag(event_id=event.id, tag_id=tag_id) for tag_id in selected_tag_ids)
-    session.commit()
+    if commit:
+        session.commit()
     return len(chunks)

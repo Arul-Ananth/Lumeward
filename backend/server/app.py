@@ -22,7 +22,7 @@ from backend.common.services.memory.vector_db import (
 )
 from backend.common.services.auth.store import ensure_trusted_lan_user
 from backend.common.services.ingestion import cleanup_managed_uploads_on_startup
-from backend.server.routers import auth, news
+from backend.server.routers import admin, auth, news
 from backend.server.qdrant_runtime import start_bundled_qdrant, stop_bundled_qdrant
 
 
@@ -57,6 +57,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(auth.router, prefix="/auth")
+    app.include_router(admin.router, prefix="/admin")
     app.include_router(news.router, prefix="/news")
     app.add_middleware(
         CORSMiddleware,
