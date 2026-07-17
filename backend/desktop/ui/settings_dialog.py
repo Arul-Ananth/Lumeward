@@ -109,9 +109,14 @@ class SettingsDialog(QDialog):
         enterprise_group = QGroupBox("Enterprise")
         enterprise_layout = QFormLayout(enterprise_group)
         self.enterprise_server_url_input = _line_input(get_enterprise_server_url())
-        self.enterprise_server_url_input.setPlaceholderText("https://lumeward.company.example")
+        self.enterprise_server_url_input.setPlaceholderText("http://127.0.0.1:8000")
         enterprise_layout.addRow("Server URL", self.enterprise_server_url_input)
-        enterprise_layout.addRow(QLabel("Restart Lumeward after changing the server URL."))
+        enterprise_help = QLabel(
+            "Use the Lumeward backend URL (port 8000 locally), not the web UI URL (port 5173). "
+            "Restart Lumeward after changing it."
+        )
+        enterprise_help.setWordWrap(True)
+        enterprise_layout.addRow(enterprise_help)
         content_layout.addWidget(enterprise_group)
 
         api_group, api_layout = _group("API Keys")

@@ -143,7 +143,8 @@ def build_llm(api_keys: dict | None = None) -> LLM:
         model=model,
         base_url=base_url,
         api_key=api_key,
-        timeout=300,
+        timeout=getattr(settings, "LLM_REQUEST_TIMEOUT_SECONDS", 300),
+        max_tokens=getattr(settings, "LLM_MAX_TOKENS", 256),
         temperature=0.7,
     )
 
