@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     OPENAI_MODEL_NAME: str = "mistral:latest"
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    LLM_REQUEST_TIMEOUT_SECONDS: int = 300
+    LLM_MAX_TOKENS: int = 256
+    CREW_MAX_ITERATIONS: int = 3
+    CREW_MAX_EXECUTION_TIME_SECONDS: int = 240
     SERPER_API_KEY: str = ""  # Optional
     ALLOW_SERVER_DDG_FALLBACK: bool = False
     ENGINE_ENABLED: bool = False

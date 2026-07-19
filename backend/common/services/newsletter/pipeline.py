@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlmodel import Session, select
 
+from backend.common.config import settings
 from backend.common.models.schemas import NewsResponse
 from backend.common.models.sql import NewsletterDigest, NewsletterSchedule, NewsletterTemplate
 from backend.common.services.llm.provider_factory import build_llm
@@ -276,7 +277,28 @@ class NewsletterPipeline:
             return self._build_current_events_brief(now=now, tools=tools)
 
         llm = build_llm(api_keys=api_keys)
-        from backend.common.services.llm.crew_builder import build_newsletter_crew
+        from backend.common.services.llm.crew_builder import (
+            build_newsletter_crew,
+            generate_newsletter_direct,
+        )
+
+        provider = (settings.LLM_PROVIDER or "ollama").strip().lower()
+        if provider == "ollama":
+            direct_context = combined_context
+            if tools:
+                try:
+                    search_result = str(tools[0].run(query=topic)).strip()
+                except Exception as exc:
+                    search_result = f"Search unavailable: {exc}"
+                if search_result:
+                    direct_context = f"{direct_context}\n\nExternal Research:\n{search_result}"
+            return generate_newsletter_direct(
+                topic=topic,
+                context=direct_context,
+                llm=llm,
+                time_sensitive=time_sensitive,
+                runtime_date_label=_runtime_date_label(now) if time_sensitive else None,
+            )
 
         crew = build_newsletter_crew(
             topic=topic,

@@ -9,7 +9,6 @@ import qasync
 from PySide6.QtWidgets import QApplication, QInputDialog, QLineEdit, QMessageBox
 from sqlmodel import Session
 
-# Fix path resolution
 project_root = Path(__file__).resolve().parents[2]
 if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
@@ -42,6 +41,58 @@ def ensure_local_user() -> int:
         return user.id
 
 
+def prompt_for_enterprise_connection(server_url: str, local_user_id: int) -> tuple[EnterpriseClient | None, int]:
+    """Connect to enterprise mode, falling back to local mode on cancel or failure."""
+    try:
+        enterprise_client = EnterpriseClient(server_url)
+        enterprise_client.check_server()
+    except Exception as exc:
+        QMessageBox.critical(
+            None,
+            "Enterprise server unavailable",
+            f"{exc}\n\nLumeward will continue in local mode. "
+            "Update Enterprise Server URL in Settings, then restart to try again.",
+        )
+        return None, local_user_id
+
+    has_account = QMessageBox.question(
+        None,
+        "Enterprise sign in",
+        "Do you already have an enterprise account?",
+        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+    )
+    if has_account == QMessageBox.StandardButton.Cancel:
+        return None, local_user_id
+
+    full_name = ""
+    if has_account == QMessageBox.StandardButton.No:
+        full_name, ok = QInputDialog.getText(None, "Create enterprise account", "Full name:")
+        if not ok or not full_name.strip():
+            return None, local_user_id
+
+    email, ok = QInputDialog.getText(None, "Enterprise sign in", "Email:")
+    if not ok or not email.strip():
+        return None, local_user_id
+    password, ok = QInputDialog.getText(
+        None, "Enterprise sign in", "Password:", QLineEdit.EchoMode.Password,
+    )
+    if not ok:
+        return None, local_user_id
+
+    try:
+        if has_account == QMessageBox.StandardButton.No:
+            enterprise_client.signup(full_name.strip(), email.strip(), password)
+        enterprise_client.login(email.strip(), password)
+        return enterprise_client, enterprise_client.user_id or local_user_id
+    except Exception as exc:
+        QMessageBox.critical(
+            None,
+            "Enterprise sign in failed",
+            f"{exc}\n\nLumeward will continue in local mode.",
+        )
+        return None, local_user_id
+
+
 def main() -> None:
     settings.configure()
     apply_llm_preferences_to_settings()
@@ -54,7 +105,6 @@ def main() -> None:
     install_system_theme_listener(app)
 
     get_signal_bus()
-
     loop = qasync.QEventLoop(app)
     asyncio.set_event_loop(loop)
 
@@ -63,49 +113,16 @@ def main() -> None:
     enterprise_client = None
     enterprise_server_url = get_enterprise_server_url()
     if enterprise_server_url:
-        enterprise_client = EnterpriseClient(
-            enterprise_server_url,
-            connect_timeout=settings.ENTERPRISE_CONNECT_TIMEOUT_SECONDS,
-            request_timeout=settings.ENTERPRISE_REQUEST_TIMEOUT_SECONDS,
-            generation_timeout=settings.ENTERPRISE_GENERATION_TIMEOUT_SECONDS,
-        )
-        has_account = QMessageBox.question(
-            None,
-            "Enterprise sign in",
-            "Do you already have an enterprise account?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
-        )
-        if has_account == QMessageBox.StandardButton.Cancel:
-            return
-        full_name = ""
-        if has_account == QMessageBox.StandardButton.No:
-            full_name, ok = QInputDialog.getText(None, "Create enterprise account", "Full name:")
-            if not ok or not full_name.strip():
-                return
-        email, ok = QInputDialog.getText(None, "Enterprise sign in", "Email:")
-        if not ok or not email.strip():
-            return
-        password, ok = QInputDialog.getText(None, "Enterprise sign in", "Password:", QLineEdit.EchoMode.Password)
-        if not ok:
-            return
-        try:
-            if has_account == QMessageBox.StandardButton.No:
-                enterprise_client.signup(full_name.strip(), email.strip(), password)
-            enterprise_client.login(email.strip(), password)
-            user_id = enterprise_client.user_id or user_id
-        except Exception as exc:
-            QMessageBox.critical(None, "Enterprise sign in failed", str(exc))
-            return
+        enterprise_client, user_id = prompt_for_enterprise_connection(enterprise_server_url, user_id)
 
     cron_worker = None if enterprise_client else CronDigestWorker()
     if cron_worker:
         cron_worker.start()
         app.aboutToQuit.connect(cron_worker.stop)
 
-    session_id = uuid.uuid4().hex
     window = MainWindow(
         user_id=user_id,
-        session_id=session_id,
+        session_id=uuid.uuid4().hex,
         enterprise_client=enterprise_client,
     )
     window.show()

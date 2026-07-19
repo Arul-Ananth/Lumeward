@@ -1,5 +1,46 @@
 from crewai import Agent, Crew, Task
 
+from backend.common.config import settings
+
+
+def generate_newsletter_direct(
+    topic: str,
+    context: str,
+    llm,
+    *,
+    time_sensitive: bool = False,
+    runtime_date_label: str | None = None,
+) -> str:
+    """Generate one bounded completion for local models that do not need tools.
+
+    Small Ollama models are good at the writing task but may not reliably emit
+    CrewAI's agent-control protocol, which otherwise causes repeated calls.
+    """
+    date_instruction = ""
+    if time_sensitive and runtime_date_label:
+        date_instruction = (
+            f" The runtime date is {runtime_date_label}; use it for relative dates "
+            "and do not invent current facts."
+        )
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You write concise Markdown intelligence briefings. "
+                "Use only the supplied context, distinguish facts from uncertainty, "
+                f"and return only the final briefing.{date_instruction}"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Write a short newsletter briefing about: {topic}\n\n"
+                f"Context:\n{context or 'No additional context was supplied.'}"
+            ),
+        },
+    ]
+    return str(llm.call(messages))
+
 
 def build_newsletter_crew(
     topic: str,
@@ -10,6 +51,9 @@ def build_newsletter_crew(
     time_sensitive: bool = False,
     runtime_date_label: str | None = None,
 ) -> Crew:
+    max_iterations = getattr(settings, "CREW_MAX_ITERATIONS", 3)
+    max_execution_seconds = getattr(settings, "CREW_MAX_EXECUTION_TIME_SECONDS", 240)
+    max_tokens = getattr(settings, "LLM_MAX_TOKENS", 256)
     researcher_backstory = (
         "You find facts matching user interests. "
         "Use the Web Search tool for any external research."
@@ -51,6 +95,10 @@ def build_newsletter_crew(
         tools=tools,
         llm=llm,
         verbose=True,
+        max_iter=max_iterations,
+        max_execution_time=max_execution_seconds,
+        max_retry_limit=1,
+        max_tokens=max_tokens,
     )
 
     writer = Agent(
@@ -59,6 +107,10 @@ def build_newsletter_crew(
         backstory=writer_backstory,
         llm=llm,
         verbose=True,
+        max_iter=max_iterations,
+        max_execution_time=max_execution_seconds,
+        max_retry_limit=1,
+        max_tokens=max_tokens,
     )
 
     task1 = Task(

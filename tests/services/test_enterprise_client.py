@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from unittest.mock import Mock
 
 import pytest
 import requests
@@ -69,6 +70,56 @@ def test_connect_timeout_has_distinct_error(monkeypatch: pytest.MonkeyPatch) -> 
 
     with pytest.raises(RuntimeError, match="connect.*7 seconds"):
         client.generate("technology")
+
+
+def test_enterprise_client_rejects_non_absolute_url() -> None:
+    with pytest.raises(ValueError, match="absolute"):
+        EnterpriseClient("127.0.0.1:8000")
+
+
+def test_health_check_explains_frontend_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    response = Mock(ok=True)
+    response.json.side_effect = requests.exceptions.JSONDecodeError("bad json", "<html>", 0)
+    monkeypatch.setattr(requests, "request", Mock(return_value=response))
+
+    client = EnterpriseClient("http://127.0.0.1:5173")
+
+    with pytest.raises(RuntimeError, match="port 5173"):
+        client.check_server()
+
+
+def test_404_explains_backend_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    response = Mock(ok=False, status_code=404, text="Not Found")
+    response.json.return_value = {"detail": "Not Found"}
+    monkeypatch.setattr(requests, "request", Mock(return_value=response))
+
+    client = EnterpriseClient("http://127.0.0.1:5173")
+
+    with pytest.raises(RuntimeError, match="http://127.0.0.1:8000"):
+        client.login("user@example.com", "password")
+
+
+def test_enterprise_startup_failure_falls_back_to_local_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    from backend.desktop import main as desktop_main
+
+    class UnavailableClient:
+        def __init__(self, _server_url: str) -> None:
+            pass
+
+        def check_server(self) -> None:
+            raise RuntimeError("not a backend")
+
+    critical = Mock()
+    monkeypatch.setattr(desktop_main, "EnterpriseClient", UnavailableClient)
+    monkeypatch.setattr(desktop_main.QMessageBox, "critical", critical)
+
+    client, user_id = desktop_main.prompt_for_enterprise_connection(
+        "http://127.0.0.1:5173", 42,
+    )
+
+    assert client is None
+    assert user_id == 42
+    assert "continue in local mode" in critical.call_args.args[2]
 
 
 @pytest.mark.parametrize("name", ["connect_timeout", "request_timeout", "generation_timeout"])
