@@ -7,7 +7,6 @@ class SignalBus(QObject):
     log_message = Signal(str)
     progress_update = Signal(int)
     result_ready = Signal(str)
-    ingest_received = Signal(dict)
     ocr_requested = Signal(QImage)
     ocr_result = Signal(str)
     ocr_error = Signal(str)

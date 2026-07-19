@@ -76,8 +76,8 @@ also supplies a copyable invitation link.
 
 The user configures a server URL, signs up or signs in, receives an opaque
 session token, loads authorized workspaces and selects one. Generation runs on
-the server. File drops and bridge content can be explicitly shared; clipboard
-text requires all privacy opt-ins. Local feed processing is disabled while
+the server. Files can be explicitly shared; clipboard text requires all privacy
+opt-ins. Local feed processing is disabled while
 connected to an enterprise server.
 
 ## Current limitations

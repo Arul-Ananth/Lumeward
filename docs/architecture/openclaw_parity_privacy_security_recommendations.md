@@ -15,7 +15,6 @@ Status: archived reference. This document is not the active Lumeward architectur
 - Desktop mode (`backend/desktop/main.py`):
   - Starts PySide6 UI with qasync event loop.
   - Provisions a local desktop user account.
-  - Starts local bridge API in separate process (`backend/desktop/services/api_server.py`) on loopback.
   - Enables optional OCR/snipping, file ingestion, and telemetry workers.
 
 ### 1.2 Auth and API
@@ -83,11 +82,9 @@ Suggested code area:
 - For remote use:
   - Strict `CORS_ALLOWED_ORIGINS` allowlist.
   - Authenticated gateway mode (reverse proxy + TLS + token/session control).
-  - Never expose desktop bridge directly; keep loopback-only bridge with per-session secret token.
 
 Suggested code area:
 - `backend/main.py`, `.env.example`, deployment docs
-- `backend/desktop/services/api_server.py` (ingest auth token)
 
 ### 2.3 Enforce user-consent policy gates for data capture (P0)
 - Clipboard is now opt-in in desktop settings. Extend same policy to all sensitive capture:
@@ -147,15 +144,12 @@ Status key: `Good`, `Partial`, `Needs Change`.
 ## 4) High-Value Refactors and Code Edits
 
 ### P0 (Do First)
-1. Bridge authentication for desktop ingest endpoint.
-   - Add required bearer token/header check in `backend/desktop/services/api_server.py`.
-   - Generate per-session random token in desktop main process and pass to bridge process.
-2. Harden auth baseline for web mode.
+1. Harden auth baseline for web mode.
    - Move JWT signing key to strong required secret on startup.
    - Add login attempt throttling + temporary lockout (IP/email tuple).
-3. Strengthen request model boundaries.
+2. Strengthen request model boundaries.
    - Set `model_config = {"extra": "forbid"}` for public request DTOs in `backend/common/models/schemas.py`.
-4. Replace frontend `localStorage` token strategy for web mode.
+3. Replace frontend `localStorage` token strategy for web mode.
    - Use HttpOnly secure cookie session (or split tokens + short expiry + rotation if bearer is retained).
 
 ### P1
@@ -201,10 +195,9 @@ Status key: `Good`, `Partial`, `Needs Change`.
 ## 6) Practical Next Changes for This Repo
 
 1. Add a new `security_policy.py` and enforce before each external tool call.
-2. Add `BRIDGE_INGEST_TOKEN` flow between desktop main and bridge server.
-3. Add `AUTH_RATE_LIMIT_*` env settings + middleware/dependency.
-4. Update schemas with strict input boundaries and explicit length constraints.
-5. Add a `docs/security.md` with threat model + trust boundaries + deployment modes.
+2. Add `AUTH_RATE_LIMIT_*` env settings + middleware/dependency.
+3. Update schemas with strict input boundaries and explicit length constraints.
+4. Add a `docs/security.md` with threat model + trust boundaries + deployment modes.
 
 ## 7) External References
 

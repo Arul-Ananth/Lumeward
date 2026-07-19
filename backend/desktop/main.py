@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import multiprocessing
-import secrets
 import sys
 import uuid
 from pathlib import Path
@@ -20,7 +19,6 @@ from backend.common.database import create_db_and_tables, get_engine
 from backend.common.logging import configure_logging
 from backend.common.services.auth.store import ensure_desktop_local_user
 from backend.desktop.preferences import apply_llm_preferences_to_settings, get_enterprise_server_url, get_theme_mode
-from backend.desktop.services.api_server import run_api_server
 from backend.desktop.services.enterprise_client import EnterpriseClient
 from backend.desktop.theme import apply_app_theme, install_system_theme_listener
 from backend.desktop.ui.main_window import MainWindow
@@ -44,21 +42,6 @@ def ensure_local_user() -> int:
         return user.id
 
 
-def start_api_server(preferred_port: int = 12345):
-    ctx = multiprocessing.get_context("spawn")
-    ingestion_queue = ctx.Queue()
-    status_queue = ctx.Queue()
-    stop_event = ctx.Event()
-    bridge_token = secrets.token_urlsafe(32)
-    process = ctx.Process(
-        target=run_api_server,
-        args=(ingestion_queue, status_queue, stop_event, preferred_port, bridge_token),
-        daemon=True,
-    )
-    process.start()
-    return ingestion_queue, status_queue, stop_event, process, bridge_token
-
-
 def main() -> None:
     settings.configure()
     apply_llm_preferences_to_settings()
@@ -80,7 +63,12 @@ def main() -> None:
     enterprise_client = None
     enterprise_server_url = get_enterprise_server_url()
     if enterprise_server_url:
-        enterprise_client = EnterpriseClient(enterprise_server_url)
+        enterprise_client = EnterpriseClient(
+            enterprise_server_url,
+            connect_timeout=settings.ENTERPRISE_CONNECT_TIMEOUT_SECONDS,
+            request_timeout=settings.ENTERPRISE_REQUEST_TIMEOUT_SECONDS,
+            generation_timeout=settings.ENTERPRISE_GENERATION_TIMEOUT_SECONDS,
+        )
         has_account = QMessageBox.question(
             None,
             "Enterprise sign in",
@@ -114,28 +102,10 @@ def main() -> None:
         cron_worker.start()
         app.aboutToQuit.connect(cron_worker.stop)
 
-    ingestion_queue = None
-    status_queue = None
-    api_stop_event = None
-    api_process = None
-    bridge_token = None
-    bridge_warning = None
-    try:
-        ingestion_queue, status_queue, api_stop_event, api_process, bridge_token = start_api_server()
-    except Exception as exc:
-        logger.exception("Failed to start local API server: %s", exc)
-        bridge_warning = "Browser bridge failed to start; disabled for this session."
-
     session_id = uuid.uuid4().hex
     window = MainWindow(
         user_id=user_id,
         session_id=session_id,
-        ingestion_queue=ingestion_queue,
-        status_queue=status_queue,
-        api_process=api_process,
-        api_stop_event=api_stop_event,
-        bridge_token=bridge_token,
-        bridge_warning=bridge_warning,
         enterprise_client=enterprise_client,
     )
     window.show()

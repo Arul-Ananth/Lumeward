@@ -121,12 +121,6 @@ files are cleaned up.
 - The current web release uses individual email/password sessions. OIDC and
   external enterprise provisioning remain future authentication options.
 
-### Desktop bridge
-
-- The local browser bridge stays on loopback.
-- It uses a runtime-generated bridge token header.
-- Uvicorn lifespan handling is disabled for the bridge app to avoid noisy shutdown `CancelledError` traces.
-
 ## Project Layout
 
 - `backend/` shared backend, server mode, desktop mode
@@ -177,6 +171,11 @@ Backend tests use pytest and default to local deterministic checks:
 .\venv_win\Scripts\python.exe -m pytest tests
 ```
 
+Pytest uses a unique temporary directory for each process, removes it after the
+session, and disables its persistent cache. This prevents stale owner-only
+Windows directories from blocking later runs under a different security
+context.
+
 Use `scripts/verify/` for targeted smoke checks that have not yet been converted
 to pytest or that need live integrations.
 
@@ -222,10 +221,15 @@ Server:
 
 ```powershell
 cd C:\Dev\lumeward
-.\venv_win\Scripts\uv.exe run lumeward --mode server
+.\scripts\dev\windows\start_server.ps1
 ```
 
-Server mode requires PostgreSQL. Qdrant may be administrator-managed
+The Windows development launcher uses `qdrant\qdrant.exe`, stores its data in
+`qdrant\storage`, runs preflight checks, and selects one project Python
+interpreter without requiring virtual-environment activation. Pass a different
+Qdrant directory with `-QdrantDirectory` when needed.
+
+Server mode requires PostgreSQL. In deployed environments, Qdrant may be administrator-managed
 (`QDRANT_MODE=external`) or a native executable owned by the Lumeward server
 (`QDRANT_MODE=bundled`). Server startup creates missing application tables and
 idempotently reconciles the event-ownership columns plus the

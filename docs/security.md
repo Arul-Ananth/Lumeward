@@ -22,7 +22,7 @@ hardening.
 - Clients select a workspace with `X-Workspace-ID`.
 - Event queries and Qdrant retrieval apply user/workspace/organization filters.
 - Enterprise desktop generation requires a selected workspace.
-- File drops and browser-bridge sharing are explicit actions.
+- File drops are explicit actions.
 - Clipboard content requires telemetry, clipboard and raw-text consent.
 - Retrieved context is untrusted input and never an authorization mechanism.
 - Organization administrators control organization roles, active status and all
@@ -58,7 +58,6 @@ hardening.
 
 - Strict typed API schemas and opaque, revocable interactive sessions.
 - Workspace membership validation and scoped SQL/vector retrieval.
-- Loopback-only, token-protected desktop bridge.
 - Opt-in telemetry with raw clipboard storage disabled by default.
 - ZIP traversal, symlink, extension, file-count and size validation.
 - Network/tool policy checks for supported external actions.

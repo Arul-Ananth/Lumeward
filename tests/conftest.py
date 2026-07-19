@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sys
+import shutil
+import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -13,6 +15,25 @@ if str(PROJECT_ROOT) not in sys.path:
 from backend.common.config import AppMode, settings
 from backend.common.database import create_db_and_tables, dispose_database
 from backend.common.services.memory import vector_db
+
+_MANAGED_PYTEST_TEMP: Path | None = None
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_configure(config: pytest.Config) -> None:
+    """Avoid stale owner-only pytest directories across Windows security contexts."""
+    global _MANAGED_PYTEST_TEMP
+    if config.option.basetemp is not None:
+        return
+    _MANAGED_PYTEST_TEMP = Path(tempfile.mkdtemp(prefix="lumeward-pytest-"))
+    config.option.basetemp = _MANAGED_PYTEST_TEMP
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    global _MANAGED_PYTEST_TEMP
+    if _MANAGED_PYTEST_TEMP is not None:
+        shutil.rmtree(_MANAGED_PYTEST_TEMP, ignore_errors=True)
+        _MANAGED_PYTEST_TEMP = None
 
 
 class FakeVectors:

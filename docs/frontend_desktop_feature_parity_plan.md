@@ -59,7 +59,6 @@ Desktop-only functionality includes:
 - Passive clipboard monitoring
 - Folder watching
 - Global hotkeys
-- Browser bridge ingestion
 - Local keyring-backed secrets
 
 ## Architectural Methods
@@ -67,7 +66,7 @@ Desktop-only functionality includes:
 ### Method A: React as the Canonical UI with a Thin Desktop Companion
 
 React is used for both web and desktop-facing business workflows. The desktop
-runtime supplies native capabilities through a small, explicit bridge.
+runtime supplies native capabilities through explicit desktop APIs.
 
 ```text
 React UI
@@ -98,10 +97,10 @@ Advantages:
 Disadvantages:
 
 - Requires migrating or replacing existing PySide screens.
-- Requires a supported bridge between React and the desktop companion.
+- Requires supported integration between React and the desktop companion.
 - Packaging becomes more complex during the transition.
 - Native and browser security models still differ.
-- A poorly designed bridge can become a security boundary risk.
+- Poorly designed desktop integration can become a security boundary risk.
 
 Recommendation:
 
@@ -667,7 +666,7 @@ Advantages:
 Disadvantages:
 
 - Requires the desktop companion.
-- Needs a React/desktop bridge if React becomes the canonical UI.
+- Needs React/desktop integration if React becomes the canonical UI.
 
 Recommendation:
 
@@ -904,7 +903,7 @@ Implement:
 - Explicit browser clipboard paste.
 - Browser screen capture.
 - OCR upload endpoint.
-- Desktop companion capability bridge.
+- Desktop companion capability integration.
 
 Exit criteria:
 

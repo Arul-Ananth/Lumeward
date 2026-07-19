@@ -23,7 +23,7 @@ def test_workspace_text_is_indexed_with_workspace_ownership(isolated_data_dir, f
         chunks = text_context.ingest_workspace_text(
             session,
             text="A deployment incident affects the engineering team.",
-            source="browser_bridge",
+            source="manual",
             title="Incident",
             user_id=user.id,
             organization_id=7,

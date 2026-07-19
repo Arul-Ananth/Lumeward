@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from qdrant_client import QdrantClient
-from qdrant_client.http.exceptions import ApiException
+from qdrant_client.http.exceptions import ApiException, ResponseHandlingException
 from qdrant_client.http import models
 from sqlmodel import Session, select
 
@@ -22,7 +22,7 @@ class QdrantUnavailableError(RuntimeError):
     """Raised when server-mode Qdrant storage cannot complete an operation."""
 
 
-_QDRANT_CONNECTION_ERRORS = (ApiException, ConnectionError, OSError, TimeoutError)
+_QDRANT_CONNECTION_ERRORS = (ApiException, ResponseHandlingException, ConnectionError, OSError, TimeoutError)
 _embedder: Any | None = None
 _embedder_lock = threading.Lock()
 _client: QdrantClient | None = None
@@ -117,7 +117,13 @@ def ensure_collection(name: str) -> None:
 
 
 def check_qdrant_ready() -> None:
-    get_client().get_collections()
+    try:
+        get_client().get_collections()
+    except _QDRANT_CONNECTION_ERRORS as exc:
+        url = settings.QDRANT_URL.strip()
+        raise QdrantUnavailableError(
+            f"Qdrant is unavailable at {url}. Start the external service or use QDRANT_MODE=bundled."
+        ) from exc
 
 
 def initialize_qdrant_collections() -> None:

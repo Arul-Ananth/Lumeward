@@ -5,6 +5,8 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from urllib.error import URLError
+from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -12,6 +14,7 @@ if str(ROOT) not in sys.path:
 
 from backend.common.config import AppMode, settings
 from backend.common.version import APP_VERSION
+from backend.server.qdrant_runtime import validate_bundled_qdrant_configuration
 
 
 def _ok(message: str) -> tuple[str, bool]:
@@ -60,6 +63,27 @@ def _check_qdrant_lock() -> tuple[str, bool]:
         return _fail(f"Qdrant local lock: locked or unavailable ({exc})")
 
 
+def _check_server_qdrant() -> tuple[str, bool]:
+    if settings.QDRANT_MODE == "bundled":
+        try:
+            binary, config, storage = validate_bundled_qdrant_configuration()
+        except RuntimeError as exc:
+            return _fail(str(exc))
+        return _ok(f"bundled Qdrant: {binary}; config: {config}; storage: {storage}")
+
+    health_url = f"{settings.QDRANT_URL.rstrip('/')}/healthz"
+    try:
+        with urlopen(health_url, timeout=2) as response:
+            if 200 <= response.status < 300:
+                return _ok(f"external Qdrant: ready at {settings.QDRANT_URL}")
+            return _fail(f"external Qdrant returned HTTP {response.status} at {health_url}")
+    except (OSError, URLError) as exc:
+        return _fail(
+            f"external Qdrant is unavailable at {settings.QDRANT_URL} ({exc}); "
+            "start it or use the bundled local-server launcher"
+        )
+
+
 def _check_desktop_platform_notes() -> list[tuple[str, bool]]:
     checks: list[tuple[str, bool]] = []
     if settings.APP_MODE != AppMode.DESKTOP:
@@ -80,7 +104,6 @@ def run_checks() -> list[tuple[str, bool]]:
         _check_python(),
         _check_env_file(),
         _check_executable("npm"),
-        _check_module("PyInstaller"),
         _check_qdrant_lock(),
     ]
     checks.extend(_check_desktop_platform_notes())
@@ -91,9 +114,11 @@ def run_checks() -> list[tuple[str, bool]]:
     if settings.APP_MODE == AppMode.SERVER:
         try:
             settings.validate_storage_configuration()
-            checks.append(_ok("server storage configuration: PostgreSQL and remote Qdrant configured"))
+            checks.append(_ok("server storage configuration: PostgreSQL and Qdrant configured"))
         except RuntimeError as exc:
             checks.append(_fail(str(exc)))
+        else:
+            checks.append(_check_server_qdrant())
     return checks
 
 

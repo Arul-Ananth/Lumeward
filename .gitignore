@@ -94,6 +94,7 @@ data/
 .runtime_verify/
 qdrant_db_local/
 qdrant_data/
+qdrant/
 tools/qdrant/storage/
 tools/qdrant/.qdrant-initialized
 qdrant-*/

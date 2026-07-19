@@ -28,22 +28,26 @@ from backend.server.qdrant_runtime import start_bundled_qdrant, stop_bundled_qdr
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    settings.validate_storage_configuration()
-    cleanup_managed_uploads_on_startup()
-    create_db_and_tables()
-    check_database_ready()
-    start_bundled_qdrant()
-    check_qdrant_ready()
-    initialize_qdrant_collections()
-    if settings.is_trusted_lan_auth():
-        with session_scope() as session:
-            ensure_trusted_lan_user(session)
     try:
+        settings.validate_storage_configuration()
+        cleanup_managed_uploads_on_startup()
+        create_db_and_tables()
+        check_database_ready()
+        start_bundled_qdrant()
+        check_qdrant_ready()
+        initialize_qdrant_collections()
+        if settings.is_trusted_lan_auth():
+            with session_scope() as session:
+                ensure_trusted_lan_user(session)
         yield
     finally:
-        close_qdrant()
-        stop_bundled_qdrant()
-        dispose_database()
+        try:
+            close_qdrant()
+        finally:
+            try:
+                stop_bundled_qdrant()
+            finally:
+                dispose_database()
 
 
 def create_app() -> FastAPI:

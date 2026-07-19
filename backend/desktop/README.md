@@ -1,11 +1,14 @@
 # Desktop Runtime
 
-- `backend/desktop/main.py` boots Qt, ensures the local desktop identity, and starts the bridge process.
+- `backend/desktop/main.py` boots Qt and ensures the local desktop identity.
 - `backend/desktop/telemetry_manager.py` coordinates collectors and delegates async work to `backend/desktop/services/telemetry_runtime.py`.
-- The desktop bridge remains protected by the per-session `X-Bridge-Token` header.
 - Local desktop storage uses SQLite and embedded Qdrant. When an Enterprise
   Server URL is configured, generation and explicitly shared context use the
   authenticated server workspace while local UI preferences remain on the device.
+- Enterprise HTTP connections use separate connect, ordinary-request and
+  generation budgets. Configure them with `ENTERPRISE_CONNECT_TIMEOUT_SECONDS`,
+  `ENTERPRISE_REQUEST_TIMEOUT_SECONDS` and
+  `ENTERPRISE_GENERATION_TIMEOUT_SECONDS`; generation defaults to five minutes.
 
 ## Linux / WSL Setup
 

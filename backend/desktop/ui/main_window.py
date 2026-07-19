@@ -1,6 +1,4 @@
 import logging
-import queue as std_queue
-import time
 from datetime import datetime
 
 from PySide6.QtCore import QTimer
@@ -37,26 +35,11 @@ class MainWindow(QMainWindow):
         self,
         user_id: int,
         session_id: str,
-        ingestion_queue=None,
-        status_queue=None,
-        api_process=None,
-        api_stop_event=None,
-        bridge_token: str | None = None,
-        bridge_warning: str | None = None,
         enterprise_client: EnterpriseClient | None = None,
     ) -> None:
         super().__init__()
         self.user_id = user_id
         self.session_id = session_id
-        self._ingestion_queue = ingestion_queue
-        self._status_queue = status_queue
-        self._api_process = api_process
-        self._api_stop_event = api_stop_event
-        self._bridge_token = bridge_token
-        self._bridge_started = False
-        self._bridge_disabled = False
-        self._bridge_deadline = None
-        self._ipc_timer: QTimer | None = None
         self.enterprise_client = enterprise_client
 
         self._ai_worker: AIWorker | None = None
@@ -109,7 +92,6 @@ class MainWindow(QMainWindow):
         self.signal_bus.log_message.connect(self.log_message)
         self.signal_bus.progress_update.connect(self.on_ai_progress)
         self.signal_bus.result_ready.connect(self.on_ai_result)
-        self.signal_bus.ingest_received.connect(self.on_ingest_payload)
         self.signal_bus.ocr_requested.connect(self.start_ocr)
         self.signal_bus.ocr_result.connect(self.on_ocr_result)
         self.signal_bus.ocr_error.connect(self.on_ocr_error)
@@ -127,23 +109,10 @@ class MainWindow(QMainWindow):
         )
         QTimer.singleShot(0, self.telemetry.start)
 
-        if self._api_process is not None:
-            self._bridge_deadline = time.monotonic() + 5.0
-
-        if self._ingestion_queue is not None or self._status_queue is not None or self._api_process is not None:
-            self._ipc_timer = QTimer(self)
-            self._ipc_timer.setInterval(200)
-            self._ipc_timer.timeout.connect(self._poll_ipc)
-            self._ipc_timer.start()
-
         self._feed_timer = QTimer(self)
         self._feed_timer.setInterval(60000)
         self._feed_timer.timeout.connect(self.process_feed_events)
         self._feed_timer.start()
-
-        if bridge_warning:
-            self.signal_bus.log_message.emit(bridge_warning)
-            self.signal_bus.status_message.emit("Browser bridge disabled for this session.")
 
         self._update_runtime_summary()
         self._update_result_metadata(None)
@@ -152,7 +121,7 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(200, self.refresh_feed)
 
     def open_settings(self) -> None:
-        dlg = SettingsDialog(self, on_saved=self._on_settings_saved, bridge_status=self._bridge_status_text())
+        dlg = SettingsDialog(self, on_saved=self._on_settings_saved)
         dlg.exec()
 
     def start_generation(self) -> None:
@@ -360,90 +329,8 @@ class MainWindow(QMainWindow):
     def on_ocr_error(self, message: str) -> None:
         self._append_activity(message)
 
-    def on_ingest_payload(self, payload: dict) -> None:
-        url = payload.get("url") or ""
-        text = payload.get("text") or ""
-        if url:
-            self._append_activity(f"Ingestion received: {url}")
-            self._append_context("Bridge URL", url)
-            if self.enterprise_client is not None:
-                self._share_enterprise_context(url, "browser_bridge", "Browser URL")
-        if text:
-            preview = text[:200] + ("..." if len(text) > 200 else "")
-            self._append_activity(f"Ingested text preview: {preview}")
-            self._append_context("Bridge Text", text)
-            if self.enterprise_client is not None:
-                self._share_enterprise_context(text, "browser_bridge", "Browser text")
-
     def activate_snipper(self) -> None:
         self.overlay.activate()
-
-    def _poll_ipc(self) -> None:
-        self._drain_ingestion_queue()
-        self._drain_status_queue()
-        self._check_bridge_health()
-
-    def _drain_ingestion_queue(self) -> None:
-        if self._ingestion_queue is None:
-            return
-        while True:
-            try:
-                payload = self._ingestion_queue.get_nowait()
-            except std_queue.Empty:
-                break
-            self.signal_bus.ingest_received.emit(payload)
-
-    def _drain_status_queue(self) -> None:
-        if self._status_queue is None:
-            return
-        while True:
-            try:
-                message = self._status_queue.get_nowait()
-            except std_queue.Empty:
-                break
-            status = message.get("status")
-            port = message.get("port")
-            if status == "starting":
-                if port:
-                    self.show_status(f"Bridge starting on port {port}...")
-                else:
-                    self.show_status("Bridge starting...")
-            elif status == "started":
-                self._bridge_started = True
-                if port:
-                    self.signal_bus.log_message.emit(f"Browser bridge started on port {port}.")
-                    self.show_status(f"Bridge ready on port {port}.")
-                else:
-                    self.signal_bus.log_message.emit("Browser bridge started.")
-                    self.show_status("Bridge ready.")
-            elif status == "failed":
-                error = message.get("error") or "Bridge failed."
-                self._disable_bridge(error)
-            self._update_runtime_summary()
-
-    def _check_bridge_health(self) -> None:
-        if self._bridge_disabled:
-            return
-        if self._api_process is not None and not self._api_process.is_alive():
-            if not self._bridge_started:
-                self._disable_bridge("Bridge failed to start.")
-            else:
-                self._disable_bridge("Bridge stopped unexpectedly.")
-            return
-
-        if self._bridge_deadline and not self._bridge_started:
-            if time.monotonic() > self._bridge_deadline:
-                self._disable_bridge("Bridge unreachable.")
-
-    def _disable_bridge(self, reason: str) -> None:
-        if self._bridge_disabled:
-            return
-        self._bridge_disabled = True
-        self.signal_bus.log_message.emit(f"Browser bridge disabled: {reason}")
-        self.signal_bus.status_message.emit("Browser bridge disabled.")
-        if self._api_stop_event is not None:
-            self._api_stop_event.set()
-        self._update_runtime_summary()
 
     def _append_context(self, label: str, content: str) -> None:
         content = content.strip()
@@ -521,14 +408,6 @@ class MainWindow(QMainWindow):
         ):
             if worker and worker.isRunning():
                 worker.wait(2000)
-
-        if self._api_stop_event is not None:
-            self._api_stop_event.set()
-        if self._api_process is not None:
-            self._api_process.join(timeout=3)
-            if self._api_process.is_alive():
-                self._api_process.terminate()
-                self._api_process.join(timeout=1)
 
         super().closeEvent(event)
 
@@ -617,15 +496,6 @@ class MainWindow(QMainWindow):
             "disabled": "Disabled",
         }.get(resolved_search_mode, resolved_search_mode.title())
         self.ui.capability_label.setText(search_label)
-
-    def _bridge_status_text(self) -> str:
-        if self._bridge_disabled:
-            return "Disabled for this session."
-        if self._api_process is None:
-            return "Unavailable in this session."
-        if self._bridge_started:
-            return "Ready on local loopback. Requests require the runtime bridge token."
-        return "Starting on local loopback. Requests require the runtime bridge token."
 
     def _update_result_metadata(
         self,

@@ -50,7 +50,7 @@ class FeedScorer:
 
         topic_key = _topic_key(topics[0])
         interest = min(1.0, 0.35 + (0.12 * len(topics)))
-        if event.source_type in {"clipboard", "ui", "bridge"}:
+        if event.source_type in {"clipboard", "ui"}:
             interest += 0.1
         priority = min(1.0, interest + _freshness_bonus(event))
         if muted:

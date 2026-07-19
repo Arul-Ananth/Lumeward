@@ -25,10 +25,10 @@ def start_bundled_qdrant() -> None:
             return
         if _process is not None and _process.poll() is None:
             raise RuntimeError("Bundled Qdrant is running but did not become healthy.")
-        binary = _binary_path()
-        config = _config_path()
+        binary = bundled_qdrant_binary_path()
+        config = bundled_qdrant_config_path()
         environment = os.environ.copy()
-        storage_dir = Path(settings.BUNDLED_QDRANT_STORAGE_DIR or settings.DATA_DIR / "qdrant-server")
+        storage_dir = bundled_qdrant_storage_path()
         storage_dir.mkdir(parents=True, exist_ok=True)
         environment["QDRANT__STORAGE__STORAGE_PATH"] = str(storage_dir)
         if settings.QDRANT_API_KEY:
@@ -56,7 +56,8 @@ def stop_bundled_qdrant() -> None:
         _process = None
 
 
-def _binary_path() -> Path:
+def bundled_qdrant_binary_path() -> Path:
+    """Return the configured executable and fail with an actionable error."""
     configured = settings.BUNDLED_QDRANT_BINARY.strip()
     if not configured:
         suffix = ".exe" if sys.platform == "win32" else ""
@@ -67,7 +68,8 @@ def _binary_path() -> Path:
     return path
 
 
-def _config_path() -> Path:
+def bundled_qdrant_config_path() -> Path:
+    """Return the configured Qdrant config file."""
     configured = settings.BUNDLED_QDRANT_CONFIG_PATH.strip()
     if not configured:
         raise RuntimeError("BUNDLED_QDRANT_CONFIG_PATH is required when QDRANT_MODE=bundled.")
@@ -75,6 +77,27 @@ def _config_path() -> Path:
     if not path.is_file():
         raise RuntimeError(f"Bundled Qdrant configuration was not found: {path}")
     return path
+
+
+def bundled_qdrant_storage_path() -> Path:
+    """Return the server-owned Qdrant storage directory."""
+    configured = settings.BUNDLED_QDRANT_STORAGE_DIR.strip()
+    if configured:
+        return Path(configured).expanduser().resolve()
+    return (settings.DATA_DIR / "qdrant-server").resolve()
+
+
+def validate_bundled_qdrant_configuration() -> tuple[Path, Path, Path]:
+    """Validate bundled paths without starting a process."""
+    binary = bundled_qdrant_binary_path()
+    config = bundled_qdrant_config_path()
+    storage = bundled_qdrant_storage_path()
+    parent = storage if storage.exists() else storage.parent
+    if not parent.exists():
+        raise RuntimeError(f"Bundled Qdrant storage parent does not exist: {parent}")
+    if not os.access(parent, os.W_OK):
+        raise RuntimeError(f"Bundled Qdrant storage is not writable: {parent}")
+    return binary, config, storage
 
 
 def _healthy() -> bool:

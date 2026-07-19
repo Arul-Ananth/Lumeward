@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     SMTP_USE_SSL: bool = False
     SMTP_TIMEOUT_SECONDS: int = 10
     ENTERPRISE_SERVER_URL: str = ""
+    ENTERPRISE_CONNECT_TIMEOUT_SECONDS: int = 5
+    ENTERPRISE_REQUEST_TIMEOUT_SECONDS: int = 30
+    ENTERPRISE_GENERATION_TIMEOUT_SECONDS: int = 300
     APP_VERSION: str = APP_VERSION
 
     # AI / External Services

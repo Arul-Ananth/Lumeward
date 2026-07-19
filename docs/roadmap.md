@@ -7,7 +7,7 @@
 - Interactive users plus legacy shared/trusted-LAN compatibility.
 - Organizations, workspaces, memberships and request-scoped authorization.
 - User, workspace and organization ownership on events and vector payloads.
-- Workspace-scoped text/file/bridge ingestion from enterprise desktop clients.
+- Workspace-scoped text and file ingestion from enterprise desktop clients.
 - Personal tag preferences and workspace tag policies.
 - Organization administration portal with atomic organization signup,
   first-workspace onboarding, role-aware member and workspace management,

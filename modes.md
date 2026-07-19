@@ -14,29 +14,39 @@ cd C:\Dev\lumeward
 Desktop has two product profiles:
 
 - **Local:** fixed local identity, SQLite, embedded Qdrant, local generation,
-  optional local collectors, OCR, screen capture, file drop and browser bridge.
+  optional local collectors, OCR, screen capture and file drop.
 - **Enterprise client:** configure the Enterprise Server URL in Settings,
   restart, authenticate with an individual account, and select an authorized
   workspace. Generation and explicitly shared context go to that workspace.
 
+Enterprise generation can legitimately take longer than ordinary API calls.
+Its read timeout defaults to 300 seconds and can be changed with
+`ENTERPRISE_GENERATION_TIMEOUT_SECONDS`; connect and ordinary request budgets
+use `ENTERPRISE_CONNECT_TIMEOUT_SECONDS` and
+`ENTERPRISE_REQUEST_TIMEOUT_SECONDS`.
+
 Local/private context is not uploaded merely because a server URL exists.
-File drops and browser-bridge content are explicit actions. Clipboard text is
-shared only when telemetry, clipboard collection and raw-text storage are all
-enabled by the user.
+File drops are explicit actions. Clipboard text is shared only when telemetry,
+clipboard collection and raw-text storage are all enabled by the user.
 
 ## Server
 
 ```powershell
 cd C:\Dev\lumeward
-.\venv_win\Scripts\uv.exe run lumeward --mode server
+.\scripts\dev\windows\start_server.ps1
 ```
 
 Useful overrides:
 
 ```powershell
-.\venv_win\Scripts\uv.exe run lumeward --mode server --host 0.0.0.0 --port 8000
-.\venv_win\Scripts\uv.exe run lumeward --mode server --auth-mode interactive
+.\scripts\dev\windows\start_server.ps1 -HostAddress 0.0.0.0 -Port 8000
+.\scripts\dev\windows\start_server.ps1 -AuthMode interactive
+.\scripts\dev\windows\start_server.ps1 -QdrantDirectory D:\Lumeward\qdrant
 ```
+
+The Windows development launcher uses bundled Qdrant from the selected
+directory and runs preflight checks before starting FastAPI. Direct server
+launches remain supported for deployments that configure an external Qdrant.
 
 Required server configuration:
 

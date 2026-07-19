@@ -59,7 +59,7 @@ def _secret_input(secret_key: str) -> QLineEdit:
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, parent=None, on_saved=None, bridge_status: str = "Unavailable"):
+    def __init__(self, parent=None, on_saved=None):
         super().__init__(parent)
         self._on_saved = on_saved
         self.setWindowTitle("Settings")
@@ -127,12 +127,6 @@ class SettingsDialog(QDialog):
         self.serper_input = _secret_input("serper_api_key")
         api_layout.addWidget(self.serper_input)
         content_layout.addWidget(api_group)
-
-        bridge_group, bridge_layout = _group("Browser Bridge")
-        bridge_label = QLabel(bridge_status)
-        bridge_label.setWordWrap(True)
-        bridge_layout.addWidget(bridge_label)
-        content_layout.addWidget(bridge_group)
 
         ingestion_group, ingestion_layout = _group("Ingestion")
         self.add_folder_btn = QPushButton("Add Folder")

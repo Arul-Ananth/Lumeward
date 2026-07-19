@@ -18,7 +18,7 @@ Lumeward is a hybrid AI brief assistant with two runtime modes built on a shared
   - Supports explicit `.zip` folder upload through `/news/ingest/folder` for local indexing.
 - `DESKTOP`
   - PySide6 desktop app.
-  - Local bridge ingestion, OCR, clipboard/file context capture, and brief generation.
+  - OCR, clipboard/file context capture, and brief generation.
   - Can authenticate to an enterprise server and select an authorized workspace.
   - Desktop UI is structured around `Personal Feed`, collapsible `Guidance`, and `Deep Dive Viewer`.
 

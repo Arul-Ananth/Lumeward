@@ -6,13 +6,7 @@ PostgreSQL must be running and the database configured in `.env` must exist.
 cd C:\Dev\lumeward
 .\venv_win\Scripts\uv.exe sync --extra desktop --extra dev
 .\venv_win\Scripts\uv.exe run python scripts\dev\database.py status
-
-$env:AUTH_MODE = "interactive"
-$env:QDRANT_MODE = "bundled"
-$env:BUNDLED_QDRANT_BINARY = (Resolve-Path ".\tools\qdrant\qdrant.exe").Path
-$env:BUNDLED_QDRANT_CONFIG_PATH = (Resolve-Path ".\packaging\qdrant\production.yaml").Path
-$env:BUNDLED_QDRANT_STORAGE_DIR = "$PWD\data\qdrant-server"
-.\venv_win\Scripts\uv.exe run lumeward --mode server --host 127.0.0.1 --port 8000
+.\scripts\dev\windows\start_server.ps1 -AuthMode interactive
 ```
 
 In a second terminal:
@@ -21,11 +15,12 @@ In a second terminal:
 cd C:\Dev\lumeward\frontend
 npm.cmd ci
 $env:VITE_API_BASE_URL = "http://127.0.0.1:8000"
-npm.cmd run dev
+npm.cmd run dev -- --host localhost
 ```
 
 Confirm `http://127.0.0.1:8000/health/ready`, then open
-`http://127.0.0.1:5173`.
+`http://localhost:5173`. The `localhost` frontend origin matches the default
+CORS allow-list.
 
 ## Two-user verification
 
