@@ -14,9 +14,10 @@ from backend.common.models.sql import (
     User,
     Tag,
 )
-from backend.common.services import organization_admin
 from backend.common.services import tag_admin
 from backend.common.services.tag_admin import create_admin_tag
+from backend.common.services.organization_setup import signup_organization
+from backend.common.services.admin_common import get_admin_scope
 
 
 def test_organization_signup_rolls_back_every_record_when_session_creation_fails(
@@ -26,7 +27,7 @@ def test_organization_signup_rolls_back_every_record_when_session_creation_fails
     def fail_session_creation(*args, **kwargs):
         raise RuntimeError("forced session failure")
 
-    monkeypatch.setattr(organization_admin, "_new_session", fail_session_creation)
+    monkeypatch.setattr("backend.common.services.organization_setup._new_session", fail_session_creation)
     request = OrganizationSignupRequest(
         full_name="Rollback Owner",
         email="rollback@example.com",
@@ -36,7 +37,7 @@ def test_organization_signup_rolls_back_every_record_when_session_creation_fails
 
     with Session(get_engine()) as session:
         with pytest.raises(RuntimeError, match="forced session failure"):
-            organization_admin.signup_organization(session, request)
+            signup_organization(session, request)
 
     with Session(get_engine()) as session:
         for model in (
@@ -74,7 +75,7 @@ def test_admin_scope_rejects_conflicting_active_organizations(isolated_data_dir)
         session.commit()
 
         with pytest.raises(PermissionError, match="conflicting active organization memberships"):
-            organization_admin.get_admin_scope(session, user.id)
+            get_admin_scope(session, user.id)
 
 
 def test_tag_and_audit_roll_back_together(isolated_data_dir, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -85,8 +86,8 @@ def test_tag_and_audit_roll_back_together(isolated_data_dir, monkeypatch: pytest
         organization_name="Tag Organization",
     )
     with Session(get_engine()) as session:
-        user, _organization, _token = organization_admin.signup_organization(session, request)
-        scope = organization_admin.get_admin_scope(session, user.id)
+        user, _organization, _token = signup_organization(session, request)
+        scope = get_admin_scope(session, user.id)
 
         def fail_audit(*args, **kwargs):
             raise RuntimeError("forced audit failure")

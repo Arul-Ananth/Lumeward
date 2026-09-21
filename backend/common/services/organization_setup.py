@@ -52,8 +52,9 @@ def signup_organization(
     session: Session,
     request: OrganizationSignupRequest,
     *,
-    new_session=_new_session,
+    new_session=None,
 ) -> tuple[User, Organization, str]:
+    session_factory = new_session if new_session is not None else _new_session
     email = str(request.email).strip().lower()
     if get_user_by_email(session, email) is not None:
         raise ValueError("Email exists")
@@ -91,7 +92,7 @@ def signup_organization(
             target_id=organization.id,
             summary={"name": organization.name},
         )
-        _auth_session, raw_token = new_session(session, user=user, identity=identity)
+        _auth_session, raw_token = session_factory(session, user=user, identity=identity)
         session.commit()
         session.refresh(user)
         session.refresh(organization)

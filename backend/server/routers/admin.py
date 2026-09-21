@@ -39,28 +39,33 @@ from backend.common.models.sql import OrganizationMembership, User, Workspace, W
 from backend.common.services.auth.resolver import get_current_principal
 from backend.common.services.auth.types import AuthPrincipal
 from backend.common.services.authorization import workspace_header
-from backend.common.services.organization_admin import (
-    _workspace_assignments_for_invitation,
+from backend.common.services.admin_common import (
     add_audit_event,
-    create_admin_workspace,
-    create_invitation,
-    effective_invitation_status,
     get_admin_scope,
-    list_admin_tags,
-    list_audit_events,
-    list_invitations,
-    list_members,
-    list_shared_context,
-    overview_counts,
-    rename_organization,
-    rename_workspace,
-    resend_invitation,
-    revoke_invitation,
-    update_member,
     visible_workspaces,
 )
-from backend.common.services.ingestion.text_context import ingest_workspace_text
+from backend.common.services.admin_queries import (
+    list_admin_tags,
+    list_audit_events,
+    list_shared_context,
+    overview_counts,
+)
+from backend.common.services.invitations import (
+    create_invitation,
+    effective_invitation_status,
+    list_invitations,
+    resend_invitation,
+    revoke_invitation,
+    workspace_assignments_for_invitation,
+)
+from backend.common.services.membership_admin import list_members, update_member
+from backend.common.services.organization_setup import (
+    create_admin_workspace,
+    rename_organization,
+    rename_workspace,
+)
 from backend.common.services.tag_admin import create_admin_tag, set_admin_workspace_tag_policy
+from backend.common.services.ingestion.text_context import ingest_workspace_text
 
 
 router = APIRouter(tags=["Organization Administration"])
@@ -338,7 +343,7 @@ def put_member(
 
 
 def _invitation_response(session: Session, invitation, invite_url: str | None = None) -> InvitationResponse:
-    assignments = _workspace_assignments_for_invitation(session, invitation.id)
+    assignments = workspace_assignments_for_invitation(session, invitation.id)
     return InvitationResponse(
         id=invitation.id,
         email=invitation.email,

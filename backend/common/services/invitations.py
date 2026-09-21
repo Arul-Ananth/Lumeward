@@ -132,10 +132,11 @@ def create_invitation(
     scope: AdminScope,
     request: InvitationCreate,
     *,
-    deliver=send_invitation_email,
+    deliver=None,
 ) -> tuple[OrganizationInvitation, str]:
+    effective_deliver = deliver if deliver is not None else send_invitation_email
     invitation, raw_token = _issue_invitation(session, scope, request)
-    delivery = deliver(
+    delivery = effective_deliver(
         recipient=invitation.email,
         organization_name=scope.organization.name,
         raw_token=raw_token,
@@ -173,8 +174,9 @@ def resend_invitation(
     scope: AdminScope,
     invitation_id: int,
     *,
-    deliver=send_invitation_email,
+    deliver=None,
 ) -> tuple[OrganizationInvitation, str]:
+    effective_deliver = deliver if deliver is not None else send_invitation_email
     if not scope.is_organization_admin:
         raise PermissionError("Organization administration permission required")
     invitation = session.get(OrganizationInvitation, invitation_id)
@@ -200,7 +202,7 @@ def resend_invitation(
         summary={"email": invitation.email},
     )
     session.commit()
-    delivery = deliver(
+    delivery = effective_deliver(
         recipient=invitation.email,
         organization_name=scope.organization.name,
         raw_token=raw_token,

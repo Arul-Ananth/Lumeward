@@ -53,13 +53,9 @@ from backend.common.services.tags import (
     set_workspace_tag_policy,
 )
 from backend.common.services.plugins import grant_plugin_capability, install_plugin
-from backend.common.services.organization_admin import (
-    _workspace_assignments_for_invitation,
-    accept_invitation,
-    effective_invitation_status,
-    invitation_by_token,
-    signup_organization,
-)
+from backend.common.services.invitations import accept_invitation, effective_invitation_status, invitation_by_token
+from backend.common.services.invitations import workspace_assignments_for_invitation
+from backend.common.services.organization_setup import signup_organization
 
 router = APIRouter(tags=["Auth"])
 
@@ -377,7 +373,7 @@ def inspect_invitation(token: str, session: Session = Depends(get_session)):
     organization = session.get(Organization, invitation.organization_id)
     if organization is None:
         raise HTTPException(status_code=404, detail="Organization not found")
-    assignments = _workspace_assignments_for_invitation(session, invitation.id)
+    assignments = workspace_assignments_for_invitation(session, invitation.id)
     existing_user = session.exec(select(User).where(User.email == invitation.email)).first() is not None
     return InvitationInspectResponse(
         email=invitation.email,

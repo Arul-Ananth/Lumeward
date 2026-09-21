@@ -21,7 +21,6 @@ from backend.common.models.sql import (
 )
 from backend.common.services.auth.store import hash_session_token
 from backend.common.services.invitation_mail import MailDeliveryResult
-from backend.common.services import organization_admin
 from backend.server.routers import admin, auth, news
 
 
@@ -332,7 +331,7 @@ def test_email_delivery_failure_preserves_copyable_invitation(
     def fail_delivery(**kwargs) -> MailDeliveryResult:
         return MailDeliveryResult(status="failed", error="SMTP unavailable")
 
-    monkeypatch.setattr(organization_admin, "send_invitation_email", fail_delivery)
+    monkeypatch.setattr("backend.common.services.invitations.send_invitation_email", fail_delivery)
     owner = _signup_organization(admin_client)
     response = admin_client.post(
         "/admin/invitations",
